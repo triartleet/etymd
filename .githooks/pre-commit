@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# clothaid: process gate. Cheap, locally-knowable checks belong here (fast, blocks the commit).
+exit 0

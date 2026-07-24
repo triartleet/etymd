@@ -1,15 +1,22 @@
 import pc from "picocolors"
 
+import type { Finding, LensReport } from "../engine/finding.js"
+import type { LedgerDiff } from "../engine/ledger.js"
 import type { ContextBudget, ProjectFacts, Scorecard, ScoreLevel } from "../core/types.js"
 import { glyph, theme } from "./theme.js"
 
 /** Strip ANSI so column widths measure printable length, not escape codes. */
 function width(s: string): number {
-  return s.replace(/\[[0-9;]*m/g, "").length
+  // eslint-disable-next-line no-control-regex
+  return s.replace(/\x1b\[[0-9;]*m/g, "").length
 }
 
 function pad(s: string, len: number): string {
   return s + " ".repeat(Math.max(0, len - width(s)))
+}
+
+function maxWidth(items: string[]): number {
+  return items.length ? Math.max(...items.map(width)) : 0
 }
 
 export function print(line = ""): void {
@@ -23,7 +30,7 @@ export function section(title: string): void {
 
 /** Aligned key/value rows. */
 export function keyValues(rows: [string, string][]): void {
-  const keyWidth = Math.max(...rows.map(([k]) => width(k)))
+  const keyWidth = maxWidth(rows.map(([k]) => k))
   for (const [k, v] of rows) {
     print(`  ${theme.dim(pad(k, keyWidth))}  ${v}`)
   }
@@ -44,10 +51,10 @@ export function meter(score: number, cols = 24): string {
 }
 
 export function renderScorecard(card: Scorecard): void {
-  section("Maturity")
+  section(`Maturity ${theme.dim(`(${card.profile} profile)`)}`)
   print(`  ${meter(card.score)}`)
   print()
-  const labelWidth = Math.max(...card.dimensions.map((d) => width(d.label)))
+  const labelWidth = maxWidth(card.dimensions.map((d) => d.label))
   for (const d of card.dimensions) {
     print(`  ${LEVEL_GLYPH[d.level]}  ${pad(d.label, labelWidth)}  ${theme.dim(d.detail)}`)
   }
@@ -115,8 +122,9 @@ export function renderFacts(facts: ProjectFacts): void {
 
   if (facts.tree.dirs.length) {
     section("Top-level layout")
+    const nameWidth = maxWidth(facts.tree.dirs.slice(0, 12).map((d) => d.name + "/"))
     for (const d of facts.tree.dirs.slice(0, 12)) {
-      print(`  ${pad(theme.info(d.name + "/"), 22)} ${theme.dim(`${d.files} files`)}`)
+      print(`  ${pad(theme.info(d.name + "/"), nameWidth + 2)} ${theme.dim(`${d.files} files`)}`)
     }
     if (facts.tree.truncated) print(`  ${theme.dim("… counts capped (large repo)")}`)
   }
@@ -128,7 +136,7 @@ export function renderContext(budget: ContextBudget, threshold: number): void {
     print(`  ${theme.dim("no always-loaded agent files found — nothing loads every session yet")}`)
     return
   }
-  const pathWidth = Math.max(...budget.files.map((f) => width(f.path)))
+  const pathWidth = maxWidth(budget.files.map((f) => f.path))
   for (const f of budget.files) {
     const heavy = f.words >= threshold
     const words = heavy ? theme.warn(`${f.words} w`) : `${f.words} w`
@@ -154,11 +162,70 @@ export function renderContext(budget: ContextBudget, threshold: number): void {
   }
 }
 
-/** A create/exists/skip diff summary for a set of planned files. */
-export function renderPlan(files: { path: string; exists: boolean; label: string }[]): void {
+/** A create/exists/differs summary for a set of planned files. */
+export function renderPlan(
+  files: { path: string; exists: boolean; differs?: boolean; label: string }[],
+): void {
   section("Plan")
   for (const f of files) {
-    const tag = f.exists ? theme.warn("exists") : theme.ok("create")
+    const tag = !f.exists
+      ? theme.ok("create")
+      : f.differs
+        ? theme.warn("differs")
+        : theme.dim("same")
     print(`  ${pc.dim("[")}${tag}${pc.dim("]")} ${theme.info(f.path)}  ${theme.dim(f.label)}`)
+  }
+}
+
+const TIER_BADGE: Record<Finding["tier"], string> = {
+  risk: pc.red(pc.bold("RISK  ")),
+  gap: pc.yellow(pc.bold("GAP   ")),
+  polish: pc.dim(pc.bold("POLISH")),
+}
+
+export function renderFindings(findings: Finding[]): void {
+  if (!findings.length) {
+    print(`  ${glyph.ok} ${theme.dim("no findings — everything examined holds up")}`)
+    return
+  }
+  for (const f of findings) {
+    print()
+    print(`  ${TIER_BADGE[f.tier]} ${theme.heading(f.claim)}`)
+    print(`         ${theme.dim("evidence")}  ${f.evidence.join(theme.dim(" · "))}`)
+    print(`         ${theme.dim("why")}       ${f.why}`)
+    if (f.action) print(`         ${theme.dim("action")}    ${f.action}`)
+    print(
+      `         ${theme.dim(`effort ${f.effort} · confidence ${f.confidence} · ${f.lens} · ${theme.dim(f.id)}`)}`,
+    )
+  }
+}
+
+export function renderLensCoverage(reports: LensReport[]): void {
+  section("Lens coverage")
+  const titleWidth = maxWidth(reports.map((r) => r.title))
+  for (const r of reports) {
+    const status =
+      r.status === "skipped"
+        ? theme.bad(`could not run — ${r.reason ?? "unknown"}`)
+        : r.findings.length
+          ? theme.warn(`${r.findings.length} finding(s)`)
+          : theme.ok("clean")
+    print(
+      `  ${r.status === "skipped" ? glyph.bad : glyph.ok}  ${pad(r.title, titleWidth)}  ${status}`,
+    )
+    for (const d of r.disclosures) print(`       ${theme.dim(`◦ ${d}`)}`)
+  }
+}
+
+export function renderLedgerDiff(diff: LedgerDiff): void {
+  const parts: string[] = []
+  if (diff.new.length) parts.push(theme.warn(`${diff.new.length} new`))
+  if (diff.stillOpen.length) parts.push(`${diff.stillOpen.length} still open`)
+  if (diff.regressed.length) parts.push(theme.bad(`${diff.regressed.length} regressed`))
+  if (diff.resolved.length) parts.push(theme.ok(`${diff.resolved.length} resolved`))
+  if (diff.dismissed.length) parts.push(theme.dim(`${diff.dismissed.length} dismissed (hidden)`))
+  if (parts.length) {
+    print()
+    print(`  ${theme.dim("since last audit:")} ${parts.join(theme.dim(" · "))}`)
   }
 }

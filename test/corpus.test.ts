@@ -1,0 +1,67 @@
+import { existsSync } from "node:fs"
+import path from "node:path"
+
+import { describe, expect, it } from "vitest"
+
+import { scanProject } from "../src/core/scan.js"
+import { buildGateInventory } from "../src/lenses/gate-integrity/inventory.js"
+
+// Read-only smoke tests over the sibling corpus repos — the dogfood harness. Each asserts only
+// durable, hand-verified facts; skipped cleanly on machines without the corpus.
+const CORPUS_ROOT = path.resolve(import.meta.dirname, "..", "..")
+const repo = (name: string) => path.join(CORPUS_ROOT, name)
+const hasRepo = (name: string) => existsSync(repo(name))
+
+describe.skipIf(!hasRepo("pepshop"))("corpus: pepshop (control — the gold standard)", () => {
+  it("scans as a pnpm workspace with wired tracked githooks", async () => {
+    const facts = await scanProject(repo("pepshop"))
+    expect(facts.packageManager).toBe("pnpm")
+    expect(facts.workspace.kind).toBe("pnpm")
+    expect(facts.hooks.source).toBe("githooks")
+    expect(facts.hooks.preCommit).toBe(true)
+    expect(facts.hooks.prePush).toBe(true)
+    expect(facts.commands.formatCheck).toBe("format:check")
+    expect(facts.artifacts.find((a) => a.id === "agents")?.exists).toBe(true)
+    expect(facts.artifacts.find((a) => a.id === "failure-modes-skill")?.exists).toBe(true)
+  })
+})
+
+describe.skipIf(!hasRepo("nx-monorepo"))("corpus: nx-monorepo (Nx team repo)", () => {
+  it("classifies the narrow unit command, never the meta runner or a writer", async () => {
+    const facts = await scanProject(repo("nx-monorepo"))
+    expect(facts.workspace.kind).toBe("nx")
+    expect(facts.commands.test).toBe("test:unit:local")
+    // The corpus defect that motivated the classifier rework: a format WRITER must never be
+    // selected where a check belongs.
+    if (facts.commands.formatCheck) {
+      const value = facts.commands.raw[facts.commands.formatCheck] ?? ""
+      expect(value).not.toContain("--write")
+      expect(value).not.toContain("format:write")
+    }
+  })
+})
+
+describe.skipIf(!hasRepo("spa-bff"))("corpus: spa-bff (SPA + BFF team repo)", () => {
+  it("sees the narrow test command and the pre-assembled no-jest trio", async () => {
+    const facts = await scanProject(repo("spa-bff"))
+    expect(facts.commands.test).toBe("test:unit")
+    expect(facts.commands.typecheck).toBe("test:types")
+    expect(facts.commands.raw["test:no-jest"]).toBeDefined()
+    expect(facts.artifacts.find((a) => a.id === "copilot")?.exists).toBe(true)
+  })
+})
+
+describe.skipIf(!hasRepo("cra-legacy"))("corpus: cra-legacy (the un-converted repo)", () => {
+  it("detects husky v3 hooks that were previously invisible", async () => {
+    const facts = await scanProject(repo("cra-legacy"))
+    expect(facts.hooks.source).toBe("husky-legacy")
+    expect(facts.hooks.lintStaged).toBe(true)
+  })
+
+  it("gate inventory finds sonar without a local coverage threshold (the motivating case)", async () => {
+    const facts = await scanProject(repo("cra-legacy"))
+    const inv = await buildGateInventory(repo("cra-legacy"), facts)
+    expect(inv.thresholds.sonarConfigured).toBe(true)
+    expect(inv.thresholds.coverageThresholdLocal).toBe(false)
+  })
+})

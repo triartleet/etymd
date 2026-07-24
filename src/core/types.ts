@@ -44,16 +44,26 @@ export interface GitFacts {
   head?: string
   hooksPath?: string
   husky: boolean
+  /** Distinct commit authors in recent history — the solo-vs-team profile signal. */
+  recentAuthors?: number
+  /** Ticket-key prefix inferred from recent commit subjects (e.g. "NGRE2E"). */
+  ticketKey?: string
 }
 
 export interface HookFacts {
-  source: "githooks" | "husky" | "none"
+  /** husky-legacy = husky v3/v4 config (package.json `husky` key or husky.config.js), no .husky dir. */
+  source: "githooks" | "husky" | "husky-legacy" | "custom" | "none"
+  /** The actual hooks directory when known (covers a custom core.hooksPath). */
+  dir?: string
   preCommit: boolean
   prePush: boolean
+  commitMsg: boolean
+  lintStaged: boolean
 }
 
 export interface ProjectFacts {
   clothaidVersion: string
+  packVersion: string
   generatedAt: string
   root: string
   name: string
@@ -92,6 +102,8 @@ export interface ScoreDimension {
 }
 
 export interface Scorecard {
+  /** The workflow profile the rubric was applied under (team drops the solo-ritual dimensions). */
+  profile: "solo" | "team"
   dimensions: ScoreDimension[]
   /** 0–100. */
   score: number
@@ -100,6 +112,12 @@ export interface Scorecard {
 }
 
 export type SetupMode = "fresh" | "migration" | "optimisation"
+
+/** A constraint that is org-mandated (hard) reads differently from a preference (soft). */
+export interface LeashPolicy {
+  enabled: boolean
+  hard: boolean
+}
 
 /** The operational constraints that parameterise the generated contract. */
 export interface LeashProfile {
@@ -111,18 +129,29 @@ export interface LeashProfile {
     network: boolean
   }
   tooling: {
-    ghCli: boolean
-    mcpServers: boolean
+    ghCli: LeashPolicy
+    mcpServers: LeashPolicy
+    /** Jira/Confluence-style ticket APIs blocked → agent delivers paste-ready drafts for tickets. */
+    ticketApiBlocked: boolean
   }
   vcs: {
     branchConvention?: string
     commitConvention?: string
+    /** Jira project key when changes are ticket-linked (e.g. "NGRE2E"). */
+    ticketKey?: string
     ticketLinked: boolean
+    /** Agent attribution in commits (Co-authored-by / "Generated with") allowed or banned. */
+    attribution: "none" | "allowed"
+  }
+  deps: {
+    exactPinning: boolean
   }
   scope: {
     minimalDiffs: boolean
     stayInScope: boolean
   }
+  /** Integrations that exist in the repo but must not be proposed (e.g. a disabled Smartling). */
+  disabledIntegrations: string[]
   notes: string[]
 }
 

@@ -1,4 +1,4 @@
-import { readFacts } from "../core/facts.js"
+import { deriveProfile, readBaseline } from "../core/facts.js"
 import { scanProject } from "../core/scan.js"
 import { scoreProject } from "../core/score.js"
 import { print, renderScorecard } from "../ui/render.js"
@@ -10,8 +10,9 @@ export interface ScoreOptions {
 }
 
 export async function run(opts: ScoreOptions): Promise<void> {
-  const facts = (await readFacts(opts.cwd)) ?? (await scanProject(opts.cwd))
-  const card = scoreProject(facts)
+  const facts = await scanProject(opts.cwd)
+  const baseline = await readBaseline(opts.cwd)
+  const card = scoreProject(facts, baseline?.profile ?? deriveProfile(facts))
 
   if (opts.json) {
     print(JSON.stringify(card, null, 2))

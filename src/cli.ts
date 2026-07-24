@@ -38,7 +38,7 @@ program
 program
   .command("init")
   .description("Reckon the project and install/migrate/optimise the agent workflow (interactive)")
-  .option("-y, --yes", "accept the suggested defaults without prompting")
+  .option("-y, --yes", "accept the suggested defaults without prompting (never overwrites)")
   .action((opts, cmd) =>
     action(async () => {
       const { run } = await import("./commands/init.js")
@@ -50,7 +50,7 @@ program
   .command("scan")
   .description("Deterministically reckon the project into a facts index")
   .option("--json", "print the raw facts as JSON")
-  .option("--no-save", "do not write .clothaid/facts.json")
+  .option("--no-save", "do not write the .clothaid cache")
   .action((opts, cmd) =>
     action(async () => {
       const { run } = await import("./commands/scan.js")
@@ -70,23 +70,43 @@ program
   )
 
 program
+  .command("audit")
+  .description("Run every lens: ranked, evidence-cited findings with a persistent ledger")
+  .option("--json", "print the machine-stable audit result as JSON")
+  .option("--truth", "truth lenses only (the doctor subset)")
+  .option("--lens <id>", "run a single lens (e.g. gate-integrity)")
+  .option("--no-ledger", "read-only: do not persist the reconciled ledger")
+  .action((opts, cmd) =>
+    action(async () => {
+      const { run } = await import("./commands/audit.js")
+      await run({
+        cwd: resolveCwd(cmd),
+        json: opts.json,
+        truth: opts.truth,
+        lens: opts.lens,
+        noLedger: !opts.ledger,
+      })
+    }),
+  )
+
+program
+  .command("doctor")
+  .description('Alias for `audit --truth` — "is the recorded reckoning still true?"')
+  .option("--json", "print findings as JSON")
+  .action((opts, cmd) =>
+    action(async () => {
+      const { run } = await import("./commands/doctor.js")
+      await run({ cwd: resolveCwd(cmd), json: opts.json })
+    }),
+  )
+
+program
   .command("context")
   .description("Measure the always-loaded context footprint and flag extraction candidates")
   .option("--json", "print the budget as JSON")
   .action((opts, cmd) =>
     action(async () => {
       const { run } = await import("./commands/context.js")
-      await run({ cwd: resolveCwd(cmd), json: opts.json })
-    }),
-  )
-
-program
-  .command("doctor")
-  .description("Audit whether the reckoning and contract are still true against the tree")
-  .option("--json", "print findings as JSON")
-  .action((opts, cmd) =>
-    action(async () => {
-      const { run } = await import("./commands/doctor.js")
       await run({ cwd: resolveCwd(cmd), json: opts.json })
     }),
   )
@@ -107,39 +127,13 @@ program
   .description(
     "Install the free local git-hook gates (process → pre-commit, correctness → pre-push)",
   )
-  .option("--ci", "also address the advisory AI-review CI job (planned)")
-  .option("-y, --yes", "skip the confirmation prompt")
+  .option("--ci", "note about the CI review gate (ships later; local gates install now)")
+  .option("-y, --yes", "skip prompts; never overwrites a hand-edited hook")
   .action((opts, cmd) =>
     action(async () => {
       const { run } = await import("./commands/gates.js")
       await run({ cwd: resolveCwd(cmd), ci: opts.ci, yes: opts.yes })
     }),
   )
-
-// Designed, reserved for a coming release — registered so the surface is complete and honest.
-const later: [string, string][] = [
-  [
-    "metrics",
-    "Instrument the loop (session weight, iterations, reversals, rework/revert) vs a baseline.",
-  ],
-  [
-    "harvest",
-    "Read the evolved source projects and propose updates to the versioned knowledge pack.",
-  ],
-  ["dashboard", "Zero-infra local surface for metrics, doctor status, and context budget."],
-  ["session", "Session runner: open with the right context, close with an archived summary."],
-  ["profile", "Shareable org leash/knowledge-pack presets applied across repos."],
-]
-for (const [name, summary] of later) {
-  program
-    .command(name)
-    .description(`${summary} ${pc.dim("(planned)")}`)
-    .action(() =>
-      action(async () => {
-        const { planned } = await import("./commands/planned.js")
-        planned(name, summary)
-      }),
-    )
-}
 
 program.parseAsync(process.argv)

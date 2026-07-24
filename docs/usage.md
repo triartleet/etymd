@@ -1,97 +1,113 @@
 # clothaid — usage guide
 
-A deeper walkthrough than the README. Every command is read-only unless it says it writes, and the
-only writes are: `.clothaid/` cache files, the workflow files you approve in `init`/`gates`, and the
-briefing `brief` emits.
+A deeper walkthrough than the README. Every command is read-only unless it says it writes. The
+writes are: the `.clothaid` cache/baseline/ledger, the workflow files you approve in
+`init`/`gates`, and the briefing `brief` emits.
 
 ## Global options
 
 - `--cwd <dir>` — operate on another project directory (default: current directory).
 - `-v, --version`, `-h, --help`.
 
-## The pipeline
+## The `.clothaid` directory — two lifecycles
 
-`init` runs the whole thing interactively; each stage is also a standalone command.
+| Path                      | Lifecycle                            | Role                                             |
+| ------------------------- | ------------------------------------ | ------------------------------------------------ |
+| `.clothaid/cache/`        | **gitignored** (init adds the entry) | transient scan cache, re-derivable               |
+| `.clothaid/baseline.json` | **committed**                        | the approved reckoning drift is measured against |
+| `.clothaid/ledger.json`   | **committed**                        | the findings memory: statuses, diffs, dismissals |
 
-```
-scan ──▶ score ──▶ (mode) ──▶ (leash) ──▶ plan ──▶ apply
- │         │                                          │
- └ facts.json                                         └ AGENTS.md + adapters + gates
-```
+## Setup
 
 ### `clothaid scan`
 
-Deterministically reckons the project and caches `.clothaid/facts.json`:
-
-- package manager (from lockfile / `packageManager`), workspace topology (pnpm/yarn/npm/nx/turbo/lerna),
-- the `scripts` classified into a **Done =** set (test / lint / typecheck / format / build / dev),
-- frameworks (from dependencies), CI system, git-hook state,
-- existing agent artifacts (AGENTS.md, CLAUDE.md, Cursor, Copilot, Cline, Windsurf, Gemini, skills…),
-- a top-level layout index with bounded file counts.
-
-Flags: `--json` (print, don't render), `--no-save` (don't cache).
+Deterministically reckons the project: package manager, workspace topology (pnpm/yarn/npm/nx/
+turbo/lerna), scripts classified into a **Done =** set (specific beats meta — `test:unit:local`
+wins over a chaining `test`; a `--write`/`--fix` command is never classified as a check),
+frameworks, CI system, git hooks (tracked `.githooks`, husky modern AND v3-legacy, custom
+`core.hooksPath`, lint-staged), existing agent artifacts, solo/team signals, and a layout index
+including meaningful dot-dirs. Flags: `--json`, `--no-save`.
 
 ### `clothaid score`
 
-Grades the project against the standard (operating contract, per-agent adapters, navigation map,
-state doc, session protocol, gate tiers, failure register) and suggests a setup mode:
-
-- **fresh** — no workflow yet,
-- **migration** — a workflow exists but is below the bar,
-- **optimisation** — a mature workflow to refine.
-
-Uses the cached reckoning if present, else scans. `--json` for the raw scorecard.
+Grades the project against the pack rubric and suggests a setup mode (fresh / migration /
+optimisation). **Profile-aware**: a team repo is not graded on solo rituals (state doc, session
+archive, failure register). `--json` for the raw scorecard.
 
 ### `clothaid init`
 
-The interactive orchestrator. Steps: reckon → scorecard → choose mode → choose per-agent adapters →
-choose gates + state doc → a short **leash** capture (may the agent commit unasked? is `gh`
-available? are changes ticket-linked?) → **plan** (a create/exists diff of every file) → confirm →
-**apply**. Existing hand-authored files are skipped unless you opt to overwrite. `-y/--yes` accepts
-all suggested defaults non-interactively.
+The interactive orchestrator: reckon → confirm the **profile** (solo/team, detected from recent
+commit authors) → scorecard → choose **mode** → adapters → gates + state doc → the **leash**
+capture → plan preview → apply → **baseline approval**.
+
+Mode is the reconcile posture:
+
+- **Fresh** — full install; asks once before overwriting differing files.
+- **Migration** — per-file reconcile for every existing file that differs: keep yours / take pack.
+- **Optimisation** — shows what's missing; you pick which artifacts to add. Nothing else is touched.
+
+`-y/--yes` accepts suggested defaults and **never overwrites**. A hand-edited hook is never
+silently replaced. Finishes by writing `.clothaid/baseline.json` (commit it) and gitignoring the
+cache.
 
 ### `clothaid gates`
 
-Installs just the free local git-hook gates: a process gate at `pre-commit` and a correctness gate
-at `pre-push` (runs your detected format-check / typecheck / lint, cheapest first), via tracked
-`.githooks/` + `git config core.hooksPath .githooks`. `--ci` acknowledges the advisory AI-review CI
-job (planned). `-y` skips the prompt.
+Just the free local git-hook gates: process gate at `pre-commit`, correctness gate at `pre-push`
+built from your detected check commands (writers can't enter it), via tracked `.githooks/` +
+`core.hooksPath`. Warns before taking over from an existing husky/custom hook setup; asks per file
+before replacing hand-edited hooks. `--ci` notes the CI review gate ships later.
 
 ### `clothaid brief`
 
-Writes `.clothaid/brief.md` — a grounded briefing that hands the deterministic facts to the agent
-already in your repo and asks it to complete the **semantic** layer (composition points, reuse
-inventory, ownership boundaries, gotchas), grounded in real files, for your approval. `--human`
-writes `.clothaid/onboarding.md` for people instead.
+Writes `.clothaid/brief.md` — a grounded briefing handing the deterministic facts to the agent
+already in your repo, asking it to complete the semantic layer (what-this-is, composition points,
+reuse inventory, ownership boundaries, conventions, gotchas) for your approval. `--human` writes
+`.clothaid/onboarding.md` for people instead.
 
-## Keeping it honest (post-setup)
+## Keeping it honest
 
-### `clothaid context`
+### `clothaid audit`
 
-Measures the **always-loaded footprint** — the files an agent reads every session (AGENTS.md, the
-pointers, Cursor rules) — in words and approximate tokens, and flags any single file heavy enough
-(≥ ~4000 words) to extract into an on-demand skill. Context is the dominant cost of the loop; this
-is the lever that keeps it lean.
+Runs every **lens** and reports through one finding schema — claim · evidence · why · action ·
+effort (S/M/L) · confidence — ranked **risk → gap → polish**, cheapest first. The report opens
+with **lens coverage**: what ran, what found nothing, what could not run and why, plus honesty
+disclosures (CI jobs inherited from unseen org templates; `allow_failure` jobs counted as
+advisory, never as gates; script-less jobs inferred from name/variables only).
+
+Findings reconcile against the **committed ledger**: the diff shows new / still-open / resolved /
+**regressed**, and a finding dismissed with a reason never resurfaces. A partial run (`--lens`,
+`--truth`) never marks unexamined findings resolved.
+
+Flags: `--lens <id>` (e.g. `gate-integrity`) · `--truth` (doctor subset) · `--json`
+(machine-stable) · `--no-ledger` (read-only).
+
+Lenses:
+
+- **contract-drift** (truth) — documented commands/artifacts/layout vs the baseline; dangling
+  references; pack-version drift.
+- **gate-integrity** — the CI ↔ local gate inventory and its three gap classes: **CI-only**
+  (shift-left: a check whose failure you meet one slow pipeline after push — `clothaid gates` is
+  the paired fix), **local-only** (bypass: hooks are `--no-verify`-skippable and CI never
+  re-checks — suppressed when unreadable inherited templates might be running it), **latent**
+  (coverage collected but nothing local gates on a number — where a Sonar server gate exists the
+  finding says exactly that its threshold is not visible in the repo; commitlint installed but no
+  commit-msg hook).
+- **maturity** — rubric gaps as findings.
 
 ### `clothaid doctor`
 
-Asks "is this still true?" — compares the cached reckoning and the contract's claims to today's
-tree: documented commands that no longer exist, artifacts that vanished, top-level dirs the repo map
-still lists, hooks installed but `core.hooksPath` unset. `--json` for CI.
+Alias for `audit --truth`: "is the recorded reckoning still true?"
 
-## Planned commands
+### `clothaid context`
 
-`metrics` (loop measurement vs a baseline) · `harvest` (grow the knowledge pack from source
-projects) · `dashboard` (a keyless local metrics/status surface) · `session` (session runner) ·
-`profile` (shareable org presets). Designed; reserved for coming releases.
+Measures the **always-loaded footprint** — the files an agent reads every session (AGENTS.md,
+pointers, and only the Cursor rules that are genuinely `alwaysApply`) — in words and approximate
+tokens, flagging any single file heavy enough (≥ ~4000 words) to extract into an on-demand skill.
+Context is the dominant cost of the loop; this is the lever that keeps it lean.
 
-## Files clothaid manages
+## Roadmap (designed, unscheduled)
 
-| Path                                                                       | Role                                            |
-| -------------------------------------------------------------------------- | ----------------------------------------------- |
-| `.clothaid/facts.json`                                                     | cached reckoning (gitignore it)                 |
-| `.clothaid/brief.md`                                                       | agent briefing (transient)                      |
-| `AGENTS.md`                                                                | operating contract — the single source of truth |
-| `CLAUDE.md`, `.cursor/rules/agents.mdc`, `.github/copilot-instructions.md` | per-agent pointers                              |
-| `PROJECT_CONTEXT.md`                                                       | ground-truth state (optional)                   |
-| `.githooks/pre-commit`, `.githooks/pre-push`                               | local gate tier (optional)                      |
+Loop metrics · knowledge harvest from source projects · a keyless dashboard · session runner ·
+org profiles · the bring-your-own-key AI-review CI job. See
+[`docs/design/002-foundation-relock.md`](design/002-foundation-relock.md) for the current locked
+design.

@@ -20,9 +20,8 @@ export async function run(opts: GatesOptions): Promise<void> {
   if (opts.ci) {
     section("CI review gate")
     print(
-      `  ${glyph.partial} ${theme.dim("The advisory AI-review CI job (bring-your-own-key) is planned for a later release.")}`,
+      `  ${glyph.partial} ${theme.dim("The advisory AI-review CI job (bring-your-own-key) ships in a later release — installing the free local gates below.")}`,
     )
-    print(`  ${theme.dim("Installing the free local correctness gate below instead.")}`)
   }
 
   if (!facts.git.isRepo) {
@@ -31,10 +30,21 @@ export async function run(opts: GatesOptions): Promise<void> {
     )
     return
   }
-  if (facts.hooks.source === "husky") {
+  if (
+    facts.hooks.source === "husky" ||
+    facts.hooks.source === "husky-legacy" ||
+    facts.hooks.source === "custom"
+  ) {
     print(
-      `  ${glyph.partial} ${theme.warn("Husky is already managing hooks.")} ${theme.dim("clothaid installs tracked .githooks + core.hooksPath; reconcile by hand to avoid two hook systems.")}`,
+      `  ${glyph.partial} ${theme.warn(`${facts.hooks.source} already manages hooks here.`)} ${theme.dim("git runs ONE hook path — installing .githooks + core.hooksPath takes over. Fold the existing hook logic in first.")}`,
     )
+    if (!opts.yes) {
+      const go = await confirm({ message: "Proceed with .githooks anyway?", initialValue: false })
+      if (isCancel(go) || !go) {
+        cancel("No changes made.")
+        return
+      }
+    }
   }
 
   const files = await planWorkflow(opts.cwd, facts, defaultLeash(facts), {
@@ -42,7 +52,28 @@ export async function run(opts: GatesOptions): Promise<void> {
     gates: true,
     state: false,
   })
-  renderPlan(files)
+  const gateFiles = files.filter((f) => f.executable)
+  renderPlan(gateFiles)
+
+  // A hand-edited hook is never silently clobbered — per-file consent when contents differ.
+  const overwrite = new Set<string>()
+  for (const f of gateFiles) {
+    if (!f.exists) continue
+    if (!f.differs) {
+      overwrite.add(f.path)
+      continue
+    }
+    if (opts.yes) continue
+    const ow = await confirm({
+      message: `${f.path} exists with different content (hand-edited?). Overwrite with the pack version?`,
+      initialValue: false,
+    })
+    if (isCancel(ow)) {
+      cancel("No changes made.")
+      return
+    }
+    if (ow) overwrite.add(f.path)
+  }
 
   if (!opts.yes) {
     const ok = await confirm({ message: "Install these git hooks and point git at .githooks?" })
@@ -52,14 +83,12 @@ export async function run(opts: GatesOptions): Promise<void> {
     }
   }
 
-  const result = await applyFiles(
-    opts.cwd,
-    files,
-    new Set(files.filter((f) => f.executable).map((f) => f.path)),
-  )
+  const result = await applyFiles(opts.cwd, gateFiles, overwrite)
   await git(opts.cwd, ["config", "core.hooksPath", ".githooks"])
 
   section("Done")
   for (const w of result.written) print(`  ${glyph.ok} ${theme.dim("wrote")} ${theme.info(w)}`)
+  for (const sk of result.skipped)
+    print(`  ${glyph.bullet} ${theme.dim("kept (hand-edited)")} ${theme.dim(sk)}`)
   print(`  ${glyph.ok} ${theme.dim("set")} ${theme.code("core.hooksPath = .githooks")}`)
 }

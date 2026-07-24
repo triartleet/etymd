@@ -1,25 +1,59 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
+import type { WorkflowProfile } from "../engine/finding.js"
 import type { ProjectFacts } from "./types.js"
 import { readJson } from "./util.js"
 
-/** Where a project's reckoning is cached. Gitignored by convention (transient, re-derivable). */
+// Two stores with opposite lifecycles:
+// - cache/facts.json — transient, re-derivable, GITIGNORED: the last scan, a convenience.
+// - baseline.json    — COMMITTED: the approved reckoning drift is measured against. Written at
+//   init (approval time), pack-versioned. Doctor/audit truth-lenses compare tree vs baseline,
+//   never vs the last peek — otherwise looking at the project resets what "drift" means.
 export const CLOTHAID_DIR = ".clothaid"
-export const FACTS_FILE = "facts.json"
+export const CACHE_DIR = path.join(CLOTHAID_DIR, "cache")
+export const CACHE_FACTS_FILE = path.join(CACHE_DIR, "facts.json")
+export const BASELINE_FILE = path.join(CLOTHAID_DIR, "baseline.json")
 
-export function factsPath(root: string): string {
-  return path.join(root, CLOTHAID_DIR, FACTS_FILE)
+export interface Baseline {
+  packVersion: string
+  clothaidVersion: string
+  approvedAt: string
+  profile: WorkflowProfile
+  facts: ProjectFacts
 }
 
-export async function writeFacts(root: string, facts: ProjectFacts): Promise<string> {
-  const dir = path.join(root, CLOTHAID_DIR)
-  await fs.mkdir(dir, { recursive: true })
-  const target = path.join(dir, FACTS_FILE)
-  await fs.writeFile(target, JSON.stringify(facts, null, 2) + "\n", "utf8")
+export function cacheFactsPath(root: string): string {
+  return path.join(root, CACHE_FACTS_FILE)
+}
+
+export function baselinePath(root: string): string {
+  return path.join(root, BASELINE_FILE)
+}
+
+async function writeJsonFile(target: string, data: unknown): Promise<string> {
+  await fs.mkdir(path.dirname(target), { recursive: true })
+  await fs.writeFile(target, JSON.stringify(data, null, 2) + "\n", "utf8")
   return target
 }
 
-export async function readFacts(root: string): Promise<ProjectFacts | null> {
-  return readJson<ProjectFacts>(factsPath(root))
+export async function writeCachedFacts(root: string, facts: ProjectFacts): Promise<string> {
+  return writeJsonFile(cacheFactsPath(root), facts)
+}
+
+export async function readCachedFacts(root: string): Promise<ProjectFacts | null> {
+  return readJson<ProjectFacts>(cacheFactsPath(root))
+}
+
+export async function writeBaseline(root: string, baseline: Baseline): Promise<string> {
+  return writeJsonFile(baselinePath(root), baseline)
+}
+
+export async function readBaseline(root: string): Promise<Baseline | null> {
+  return readJson<Baseline>(baselinePath(root))
+}
+
+/** Solo vs team, from recent-author cardinality; init lets the human confirm/override. */
+export function deriveProfile(facts: ProjectFacts): WorkflowProfile {
+  return (facts.git.recentAuthors ?? 1) > 2 ? "team" : "solo"
 }
