@@ -1,24 +1,25 @@
 {
-  "name": "clothaid",
+  "name": "etymd",
   "version": "0.0.1",
-  "description": "Agent-agnostic agentic-workflow CLI — reckon a project and install, migrate, or optimise a disciplined AI-agent workflow, then keep it honest.",
+  "description": "Keep your agent instructions true — verify AGENTS.md, CLAUDE.md, rules & skills against the actual repo, with drift caught over time and a regression ledger.",
   "keywords": [
     "cli",
     "ai",
     "agents",
-    "agentic",
-    "workflow",
-    "claude",
-    "cursor",
-    "copilot",
-    "developer-tools",
-    "scaffolding"
+    "agents-md",
+    "claude-md",
+    "instructions",
+    "lint",
+    "drift",
+    "context-engineering",
+    "truth",
+    "developer-tools"
   ],
   "license": "MIT",
   "author": "Alkis Yuv",
   "type": "module",
   "bin": {
-    "clothaid": "./dist/cli.js"
+    "etymd": "./dist/cli.js"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",

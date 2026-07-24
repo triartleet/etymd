@@ -46,7 +46,7 @@ export function deriveGateFindings(inv: GateInventory): Finding[] {
         claim: "Tracked .githooks/ exist but git core.hooksPath is unset — the hooks never run",
         evidence: [".githooks/"],
         why: "Every check in those hooks is silently skipped on this clone.",
-        action: "Run `git config core.hooksPath .githooks` (clothaid gates does this).",
+        action: "Run `git config core.hooksPath .githooks` (etymd gates does this).",
         effort: "S",
         confidence: "high",
       }),
@@ -68,8 +68,7 @@ export function deriveGateFindings(inv: GateInventory): Finding[] {
         claim: `${TOOL_LABEL[tool]} is enforced only in CI — no local hook runs it`,
         evidence: jobs.map((j) => `${j.file} job \`${j.job}\`${branchNote}`),
         why: "A failure is invisible until the pipeline runs — the slowest possible feedback loop.",
-        action:
-          "Wire it into a pre-push hook — `clothaid gates` generates one from your own scripts.",
+        action: "Wire it into a pre-push hook — `etymd gates` generates one from your own scripts.",
         effort: "S",
         confidence: "high",
       }),

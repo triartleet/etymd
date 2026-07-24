@@ -1,16 +1,7 @@
 import path from "node:path"
 
-import {
-  generateAgentsMd,
-  generateClaudePointer,
-  generateCopilotInstructions,
-  generateCursorRule,
-  generatePreCommitHook,
-  generatePrePushHook,
-  generateProjectContext,
-} from "../pack/templates.js"
-import type { WorkflowProfile } from "../engine/finding.js"
-import type { LeashProfile, ProjectFacts } from "./types.js"
+import { generateAgentsMd, generatePreCommitHook, generatePrePushHook } from "../pack/templates.js"
+import type { ProjectFacts } from "./types.js"
 import { pathExists, readText } from "./util.js"
 
 export interface GeneratedFile {
@@ -26,17 +17,15 @@ export interface GeneratedFile {
 }
 
 export interface PlanOptions {
-  adapters: string[]
+  /** Scaffold a minimal AGENTS.md (init only offers this when none exists). */
+  agents: boolean
   gates: boolean
-  state: boolean
-  profile?: WorkflowProfile
 }
 
-/** Build the full set of files a setup would write, flagging which exist and which differ. */
+/** Build the file set an onboarding would write, flagging which exist and which differ. */
 export async function planWorkflow(
   root: string,
   facts: ProjectFacts,
-  leash: LeashProfile,
   opts: PlanOptions,
 ): Promise<GeneratedFile[]> {
   const out: GeneratedFile[] = []
@@ -54,26 +43,9 @@ export async function planWorkflow(
     })
   }
 
-  const profile = opts.profile ?? "solo"
-  await add(
-    "AGENTS.md",
-    generateAgentsMd(facts, leash, { state: opts.state, profile }),
-    "Operating contract (source of truth)",
-  )
-  if (opts.state)
-    await add("PROJECT_CONTEXT.md", generateProjectContext(facts), "Ground-truth state")
-
-  if (opts.adapters.includes("claude"))
-    await add("CLAUDE.md", generateClaudePointer(), "Claude Code pointer")
-  if (opts.adapters.includes("copilot"))
-    await add(
-      ".github/copilot-instructions.md",
-      generateCopilotInstructions(),
-      "Copilot instructions",
-    )
-  if (opts.adapters.includes("cursor"))
-    await add(".cursor/rules/agents.mdc", generateCursorRule(), "Cursor rule")
-
+  if (opts.agents) {
+    await add("AGENTS.md", generateAgentsMd(facts), "Minimal operating contract (scaffold)")
+  }
   if (opts.gates) {
     await add(".githooks/pre-commit", generatePreCommitHook(), "Process gate (pre-commit)", true)
     await add(".githooks/pre-push", generatePrePushHook(facts), "Correctness gate (pre-push)", true)

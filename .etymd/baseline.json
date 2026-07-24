@@ -1,0 +1,199 @@
+{
+  "packVersion": "1",
+  "etymdVersion": "0.0.1",
+  "approvedAt": "2026-07-24T16:41:49.139Z",
+  "profile": "solo",
+  "facts": {
+    "etymdVersion": "0.0.1",
+    "packVersion": "1",
+    "generatedAt": "2026-07-24T16:41:49.135Z",
+    "root": "/Users/redacted/projects/etymd",
+    "name": "etymd",
+    "git": {
+      "isRepo": true,
+      "branch": "main",
+      "head": "5a634ad",
+      "hooksPath": ".githooks",
+      "husky": false,
+      "recentAuthors": 1
+    },
+    "packageManager": "npm",
+    "node": ">=18.17",
+    "workspace": {
+      "kind": "none",
+      "packageGlobs": []
+    },
+    "packages": [],
+    "frameworks": [],
+    "commands": {
+      "raw": {
+        "build": "tsup",
+        "dev": "tsup --watch",
+        "start": "node dist/cli.js",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "prepublishOnly": "npm run build",
+        "changeset": "changeset",
+        "version:packages": "changeset version",
+        "release": "npm run build && changeset publish"
+      },
+      "formatCheck": "format:check",
+      "typecheck": "typecheck",
+      "test": "test",
+      "format": "format",
+      "build": "build",
+      "dev": "dev"
+    },
+    "ci": {
+      "system": "github",
+      "files": [".github/workflows/ci.yml"]
+    },
+    "hooks": {
+      "source": "githooks",
+      "dir": ".githooks",
+      "preCommit": true,
+      "prePush": true,
+      "commitMsg": false,
+      "lintStaged": false
+    },
+    "artifacts": [
+      {
+        "id": "agents",
+        "label": "AGENTS.md (operating contract)",
+        "path": "AGENTS.md",
+        "kind": "contract",
+        "exists": true
+      },
+      {
+        "id": "project-context",
+        "label": "PROJECT_CONTEXT.md (ground-truth state)",
+        "path": "PROJECT_CONTEXT.md",
+        "kind": "state",
+        "exists": false
+      },
+      {
+        "id": "claude",
+        "label": "CLAUDE.md (Claude Code pointer)",
+        "path": "CLAUDE.md",
+        "kind": "adapter",
+        "exists": true
+      },
+      {
+        "id": "copilot",
+        "label": "Copilot instructions",
+        "path": ".github/copilot-instructions.md",
+        "kind": "adapter",
+        "exists": false
+      },
+      {
+        "id": "cursorrules",
+        "label": ".cursorrules (legacy Cursor)",
+        "path": ".cursorrules",
+        "kind": "adapter",
+        "exists": false
+      },
+      {
+        "id": "cursor-rules",
+        "label": ".cursor/rules",
+        "path": ".cursor/rules",
+        "kind": "adapter",
+        "exists": false
+      },
+      {
+        "id": "gemini",
+        "label": "GEMINI.md",
+        "path": "GEMINI.md",
+        "kind": "adapter",
+        "exists": false
+      },
+      {
+        "id": "cline",
+        "label": ".clinerules",
+        "path": ".clinerules",
+        "kind": "adapter",
+        "exists": false
+      },
+      {
+        "id": "windsurf",
+        "label": ".windsurfrules",
+        "path": ".windsurfrules",
+        "kind": "adapter",
+        "exists": false
+      },
+      {
+        "id": "skills",
+        "label": "Agent skills (.claude/skills)",
+        "path": ".claude/skills",
+        "kind": "skill",
+        "exists": false
+      },
+      {
+        "id": "failure-modes-skill",
+        "label": "Failure-modes register (skill)",
+        "path": ".claude/skills/failure-modes",
+        "kind": "skill",
+        "exists": false
+      },
+      {
+        "id": "failure-modes-doc",
+        "label": "Failure-modes register (doc)",
+        "path": "docs/failure-modes.md",
+        "kind": "other",
+        "exists": false
+      },
+      {
+        "id": "sessions",
+        "label": "Session archive (docs/sessions)",
+        "path": "docs/sessions",
+        "kind": "sessions",
+        "exists": false
+      },
+      {
+        "id": "githooks",
+        "label": "Tracked git hooks (.githooks)",
+        "path": ".githooks",
+        "kind": "gate",
+        "exists": true
+      },
+      {
+        "id": "inventory",
+        "label": "Reuse inventory (docs/INVENTORY.md)",
+        "path": "docs/INVENTORY.md",
+        "kind": "map",
+        "exists": false
+      }
+    ],
+    "tree": {
+      "dirs": [
+        {
+          "name": "src",
+          "files": 31
+        },
+        {
+          "name": "test",
+          "files": 6
+        },
+        {
+          "name": "docs",
+          "files": 4
+        },
+        {
+          "name": ".changeset",
+          "files": 2
+        },
+        {
+          "name": ".githooks",
+          "files": 2
+        },
+        {
+          "name": ".github",
+          "files": 1
+        }
+      ],
+      "truncated": false
+    }
+  }
+}

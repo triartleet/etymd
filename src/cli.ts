@@ -28,17 +28,42 @@ async function action(fn: () => Promise<void>): Promise<void> {
 const program = new Command()
 
 program
-  .name("clothaid")
+  .name("etymd")
   .description(
-    "Agent-agnostic agentic-workflow CLI — reckon, set up, and keep an AI-agent workflow honest.",
+    "Keep your agent instructions true — verify AGENTS.md & friends against the actual repo, on a budget, with drift caught over time.",
   )
   .version(VERSION, "-v, --version")
   .option("--cwd <dir>", "run against a different project directory", process.cwd())
 
 program
+  .command("audit")
+  .description("Verify every instruction claim against the repo: ranked findings + ledger diff")
+  .option("--json", "print the machine-stable audit result as JSON")
+  .option("--truth", "truth lenses only (the doctor subset)")
+  .option("--lens <id>", "run a single lens (instruction-truth | gate-integrity | context-economy)")
+  .option("--no-ledger", "read-only: do not persist the reconciled ledger")
+  .option(
+    "--fail-on <tier>",
+    "exit non-zero when findings at/above this tier exist (risk|gap|polish)",
+  )
+  .action((opts, cmd) =>
+    action(async () => {
+      const { run } = await import("./commands/audit.js")
+      await run({
+        cwd: resolveCwd(cmd),
+        json: opts.json,
+        truth: opts.truth,
+        lens: opts.lens,
+        noLedger: !opts.ledger,
+        failOn: opts.failOn,
+      })
+    }),
+  )
+
+program
   .command("init")
-  .description("Reckon the project and install/migrate/optimise the agent workflow (interactive)")
-  .option("-y, --yes", "accept the suggested defaults without prompting (never overwrites)")
+  .description("Onboard the truth guard: approve the baseline; scaffold AGENTS.md only if missing")
+  .option("-y, --yes", "accept defaults without prompting (never overwrites)")
   .action((opts, cmd) =>
     action(async () => {
       const { run } = await import("./commands/init.js")
@@ -50,7 +75,7 @@ program
   .command("scan")
   .description("Deterministically reckon the project into a facts index")
   .option("--json", "print the raw facts as JSON")
-  .option("--no-save", "do not write the .clothaid cache")
+  .option("--no-save", "do not write the .etymd cache")
   .action((opts, cmd) =>
     action(async () => {
       const { run } = await import("./commands/scan.js")
@@ -59,39 +84,8 @@ program
   )
 
 program
-  .command("score")
-  .description("Grade the project's agentic-workflow maturity")
-  .option("--json", "print the scorecard as JSON")
-  .action((opts, cmd) =>
-    action(async () => {
-      const { run } = await import("./commands/score.js")
-      await run({ cwd: resolveCwd(cmd), json: opts.json })
-    }),
-  )
-
-program
-  .command("audit")
-  .description("Run every lens: ranked, evidence-cited findings with a persistent ledger")
-  .option("--json", "print the machine-stable audit result as JSON")
-  .option("--truth", "truth lenses only (the doctor subset)")
-  .option("--lens <id>", "run a single lens (e.g. gate-integrity)")
-  .option("--no-ledger", "read-only: do not persist the reconciled ledger")
-  .action((opts, cmd) =>
-    action(async () => {
-      const { run } = await import("./commands/audit.js")
-      await run({
-        cwd: resolveCwd(cmd),
-        json: opts.json,
-        truth: opts.truth,
-        lens: opts.lens,
-        noLedger: !opts.ledger,
-      })
-    }),
-  )
-
-program
   .command("doctor")
-  .description('Alias for `audit --truth` — "is the recorded reckoning still true?"')
+  .description('Alias for `audit --truth` — "are the recorded instructions still true?"')
   .option("--json", "print findings as JSON")
   .action((opts, cmd) =>
     action(async () => {
@@ -124,9 +118,7 @@ program
 
 program
   .command("gates")
-  .description(
-    "Install the free local git-hook gates (process → pre-commit, correctness → pre-push)",
-  )
+  .description("Install the local git-hook gates (process → pre-commit, correctness → pre-push)")
   .option("--ci", "note about the CI review gate (ships later; local gates install now)")
   .option("-y, --yes", "skip prompts; never overwrites a hand-edited hook")
   .action((opts, cmd) =>

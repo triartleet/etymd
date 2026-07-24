@@ -15,7 +15,7 @@ import {
 let dir: string
 
 beforeEach(async () => {
-  dir = await fs.mkdtemp(path.join(os.tmpdir(), "clothaid-gate-"))
+  dir = await fs.mkdtemp(path.join(os.tmpdir(), "etymd-gate-"))
 })
 
 afterEach(async () => {

@@ -1,113 +1,95 @@
-# clothaid — usage guide
+# etymd — usage guide
 
 A deeper walkthrough than the README. Every command is read-only unless it says it writes. The
-writes are: the `.clothaid` cache/baseline/ledger, the workflow files you approve in
-`init`/`gates`, and the briefing `brief` emits.
+writes are: the `.etymd` cache/baseline/ledger, the files you approve in `init`/`gates`, and the
+briefing `brief` emits. Probing a repo that never opted in (`audit --no-ledger`) leaves zero trace.
 
 ## Global options
 
 - `--cwd <dir>` — operate on another project directory (default: current directory).
 - `-v, --version`, `-h, --help`.
 
-## The `.clothaid` directory — two lifecycles
+## The `.etymd` directory — two lifecycles
 
-| Path                      | Lifecycle                            | Role                                             |
-| ------------------------- | ------------------------------------ | ------------------------------------------------ |
-| `.clothaid/cache/`        | **gitignored** (init adds the entry) | transient scan cache, re-derivable               |
-| `.clothaid/baseline.json` | **committed**                        | the approved reckoning drift is measured against |
-| `.clothaid/ledger.json`   | **committed**                        | the findings memory: statuses, diffs, dismissals |
+| Path                   | Lifecycle                            | Role                                             |
+| ---------------------- | ------------------------------------ | ------------------------------------------------ |
+| `.etymd/cache/`        | **gitignored** (init adds the entry) | transient scan cache, re-derivable               |
+| `.etymd/baseline.json` | **committed**                        | the approved reckoning drift is measured against |
+| `.etymd/ledger.json`   | **committed**                        | the findings memory: statuses, diffs, dismissals |
 
-## Setup
+## `etymd audit` — the command
 
-### `clothaid scan`
-
-Deterministically reckons the project: package manager, workspace topology (pnpm/yarn/npm/nx/
-turbo/lerna), scripts classified into a **Done =** set (specific beats meta — `test:unit:local`
-wins over a chaining `test`; a `--write`/`--fix` command is never classified as a check),
-frameworks, CI system, git hooks (tracked `.githooks`, husky modern AND v3-legacy, custom
-`core.hooksPath`, lint-staged), existing agent artifacts, solo/team signals, and a layout index
-including meaningful dot-dirs. Flags: `--json`, `--no-save`.
-
-### `clothaid score`
-
-Grades the project against the pack rubric and suggests a setup mode (fresh / migration /
-optimisation). **Profile-aware**: a team repo is not graded on solo rituals (state doc, session
-archive, failure register). `--json` for the raw scorecard.
-
-### `clothaid init`
-
-The interactive orchestrator: reckon → confirm the **profile** (solo/team, detected from recent
-commit authors) → scorecard → choose **mode** → adapters → gates + state doc → the **leash**
-capture → plan preview → apply → **baseline approval**.
-
-Mode is the reconcile posture:
-
-- **Fresh** — full install; asks once before overwriting differing files.
-- **Migration** — per-file reconcile for every existing file that differs: keep yours / take pack.
-- **Optimisation** — shows what's missing; you pick which artifacts to add. Nothing else is touched.
-
-`-y/--yes` accepts suggested defaults and **never overwrites**. A hand-edited hook is never
-silently replaced. Finishes by writing `.clothaid/baseline.json` (commit it) and gitignoring the
-cache.
-
-### `clothaid gates`
-
-Just the free local git-hook gates: process gate at `pre-commit`, correctness gate at `pre-push`
-built from your detected check commands (writers can't enter it), via tracked `.githooks/` +
-`core.hooksPath`. Warns before taking over from an existing husky/custom hook setup; asks per file
-before replacing hand-edited hooks. `--ci` notes the CI review gate ships later.
-
-### `clothaid brief`
-
-Writes `.clothaid/brief.md` — a grounded briefing handing the deterministic facts to the agent
-already in your repo, asking it to complete the semantic layer (what-this-is, composition points,
-reuse inventory, ownership boundaries, conventions, gotchas) for your approval. `--human` writes
-`.clothaid/onboarding.md` for people instead.
-
-## Keeping it honest
-
-### `clothaid audit`
-
-Runs every **lens** and reports through one finding schema — claim · evidence · why · action ·
-effort (S/M/L) · confidence — ranked **risk → gap → polish**, cheapest first. The report opens
-with **lens coverage**: what ran, what found nothing, what could not run and why, plus honesty
-disclosures (CI jobs inherited from unseen org templates; `allow_failure` jobs counted as
-advisory, never as gates; script-less jobs inferred from name/variables only).
+Verifies every instruction claim against the repo and reports through one finding schema — claim ·
+evidence (file/job) · why it matters · action · effort (S/M/L) · confidence — ranked **risk → gap
+→ polish**, cheapest first. The report opens with **lens coverage**: what ran, what found nothing,
+what could not run and why, plus honesty disclosures (unreadable org-template CI includes;
+`allow_failure` jobs counted as advisory; skipped heuristics).
 
 Findings reconcile against the **committed ledger**: the diff shows new / still-open / resolved /
 **regressed**, and a finding dismissed with a reason never resurfaces. A partial run (`--lens`,
 `--truth`) never marks unexamined findings resolved.
 
-Flags: `--lens <id>` (e.g. `gate-integrity`) · `--truth` (doctor subset) · `--json`
-(machine-stable) · `--no-ledger` (read-only).
+Flags: `--lens <id>` · `--truth` (doctor subset) · `--json` (machine-stable) · `--no-ledger`
+(read-only) · `--fail-on <risk|gap|polish>` (exit non-zero at/above the tier — the CI gate).
 
-Lenses:
+### The lenses
 
-- **contract-drift** (truth) — documented commands/artifacts/layout vs the baseline; dangling
-  references; pack-version drift.
-- **gate-integrity** — the CI ↔ local gate inventory and its three gap classes: **CI-only**
-  (shift-left: a check whose failure you meet one slow pipeline after push — `clothaid gates` is
-  the paired fix), **local-only** (bypass: hooks are `--no-verify`-skippable and CI never
-  re-checks — suppressed when unreadable inherited templates might be running it), **latent**
-  (coverage collected but nothing local gates on a number — where a Sonar server gate exists the
-  finding says exactly that its threshold is not visible in the repo; commitlint installed but no
-  commit-msg hook).
-- **maturity** — rubric gaps as findings.
+**`instruction-truth`** (truth) — over AGENTS.md, CLAUDE.md, GEMINI.md, Copilot instructions,
+`.cursorrules`, `.cursor/rules/*`, `.clinerules`, `.claude/skills/*/SKILL.md`:
 
-### `clothaid doctor`
+- **Command claims**: `pnpm X` / `yarn X` / `npm run X` / `npm test` references must name a real
+  script. Package-manager built-ins are ignored; workspace-filtered invocations
+  (`pnpm --filter …`) are skipped and counted in the disclosure.
+- **Path claims**: single-token repo-relative references must exist. Conservative by design —
+  absolute paths, globs, URLs, `@scope/pkg` specs, `$param` route segments are skipped; capped
+  per file; every skip class disclosed.
+- **Package-manager consistency**: a file repeatedly commanding a different PM than the lockfile's
+  is flagged.
+- **Cross-references**: mentions of AGENTS.md / CLAUDE.md / PROJECT_CONTEXT.md / GEMINI.md must
+  resolve to real files.
+- **Baseline drift**: role commands (test/lint/typecheck/format/build), artifacts, and top-level
+  dirs that existed at the approved baseline and are now gone.
 
-Alias for `audit --truth`: "is the recorded reckoning still true?"
+**`gate-integrity`** — the CI ↔ local gate inventory (GitLab incl. `extends`/`!reference`/local
+includes/script-less jobs, GitHub workflows, husky modern + v3-legacy, lint-staged, `.githooks`),
+three gap classes: **CI-only** (shift-left — `etymd gates` is the paired fix), **local-only**
+(bypass — suppressed when unreadable inherited templates might run the check), **latent**
+(coverage collected but no local threshold — server-side Sonar gates are named as living on the
+server; commitlint installed but unwired).
 
-### `clothaid context`
+**`context-economy`** — the always-loaded footprint as findings: any single file ≥ 4000 words,
+total ≥ 8000 words (defaults; configuration is a later release). Only genuinely `alwaysApply`
+Cursor rules count.
 
-Measures the **always-loaded footprint** — the files an agent reads every session (AGENTS.md,
-pointers, and only the Cursor rules that are genuinely `alwaysApply`) — in words and approximate
-tokens, flagging any single file heavy enough (≥ ~4000 words) to extract into an on-demand skill.
-Context is the dominant cost of the loop; this is the lever that keeps it lean.
+## `etymd init` — onboarding
 
-## Roadmap (designed, unscheduled)
+Reckon → confirm the workflow profile (solo/team, detected from recent commit authors) → scaffold
+a minimal AGENTS.md **only if none exists** → offer local gates **only if no hook system exists**
+→ write the **committed baseline** + gitignore the cache. Never overwrites anything. `-y` accepts
+defaults.
 
-Loop metrics · knowledge harvest from source projects · a keyless dashboard · session runner ·
-org profiles · the bring-your-own-key AI-review CI job. See
-[`docs/design/002-foundation-relock.md`](design/002-foundation-relock.md) for the current locked
-design.
+The scaffold contains only what the scan can assert truthfully (stack, Done=, commands, an
+advisory map with its re-verify command) plus clearly marked slots — `etymd brief` hands your
+in-repo agent a grounded briefing to complete the semantic layer, and `etymd audit` then holds
+the result to account.
+
+## The rest
+
+- **`etymd doctor`** — alias for `audit --truth`.
+- **`etymd context`** — the per-file economy view of the same data the lens uses.
+- **`etymd gates`** — tracked `.githooks/` + `core.hooksPath`; the pre-push gate is built from
+  your own detected check commands, and a writing command (`--write`/`--fix`/codegen) can never
+  enter it. Warns before taking over from husky/custom hooks; never silently replaces a
+  hand-edited hook.
+- **`etymd scan`** — the deterministic reckoning (package manager, workspace, script
+  classification, hooks incl. husky v3, CI, instruction artifacts, layout). `--json`.
+- **`etymd brief`** — writes `.etymd/brief.md` (or `--human` for onboarding people).
+
+## CI recipe
+
+```yaml
+- run: npx etymd audit --json --fail-on risk
+```
+
+Commit `.etymd/baseline.json` + `.etymd/ledger.json`; keep `.etymd/cache/` ignored. Refresh the
+baseline by re-running `etymd init` after intentional structural changes.

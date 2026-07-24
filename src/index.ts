@@ -1,8 +1,6 @@
-// Programmatic surface — the deterministic core + engine, usable without the CLI.
+// Programmatic surface — the deterministic core + the truth engine, usable without the CLI.
 export { scanProject } from "./core/scan.js"
-export { scoreProject } from "./core/score.js"
 export { measureContext, EXTRACTION_THRESHOLD, isAlwaysAppliedCursorRule } from "./core/context.js"
-export { defaultLeash } from "./core/leash.js"
 export { planWorkflow } from "./core/generate.js"
 export { applyFiles } from "./core/apply.js"
 export {
@@ -31,23 +29,24 @@ export {
   type LedgerEntry,
   type LedgerDiff,
 } from "./engine/ledger.js"
+export { instructionTruthLens } from "./lenses/instruction-truth/lens.js"
+export {
+  extractCommandClaims,
+  extractPathClaims,
+  listInstructionFiles,
+} from "./lenses/instruction-truth/claims.js"
+export { contextEconomyLens, TOTAL_BUDGET_WORDS } from "./lenses/context-economy.js"
 export {
   buildGateInventory,
   type GateInventory,
   type GateTool,
 } from "./lenses/gate-integrity/inventory.js"
+export { gateIntegrityLens } from "./lenses/gate-integrity/lens.js"
 export { PACK_VERSION } from "./pack/version.js"
-export { RUBRIC } from "./pack/rubric.js"
 export { VERSION, NAME } from "./version.js"
 
 export type {
   ProjectFacts,
-  Scorecard,
-  ScoreDimension,
-  ScoreLevel,
-  SetupMode,
-  LeashProfile,
-  LeashPolicy,
   ContextBudget,
   ContextFile,
   DiscoveredCommands,

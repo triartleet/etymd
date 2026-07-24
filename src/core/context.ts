@@ -5,7 +5,7 @@ import type { ContextBudget, ContextFile } from "./types.js"
 import { approxTokens, pathExists, readText, wordCount } from "./util.js"
 
 // The always-loaded set: files an agent reads on (nearly) every session regardless of task.
-// This is the footprint clothaid holds down — context is the dominant cost of the loop.
+// This is the footprint etymd holds down — context is the dominant cost of the loop.
 const ALWAYS_LOADED: { path: string; role: string }[] = [
   { path: "AGENTS.md", role: "operating contract" },
   { path: "CLAUDE.md", role: "Claude Code pointer" },

@@ -10,7 +10,7 @@ import { scanProject } from "../src/core/scan.js"
 let dir: string
 
 beforeEach(async () => {
-  dir = await fs.mkdtemp(path.join(os.tmpdir(), "clothaid-scan-"))
+  dir = await fs.mkdtemp(path.join(os.tmpdir(), "etymd-scan-"))
 })
 
 afterEach(async () => {

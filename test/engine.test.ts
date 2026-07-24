@@ -79,7 +79,7 @@ describe("reconcileLedger", () => {
 describe("applyFiles", () => {
   let dir: string
   beforeEach(async () => {
-    dir = await fs.mkdtemp(path.join(os.tmpdir(), "clothaid-apply-"))
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "etymd-apply-"))
   })
   afterEach(async () => {
     await fs.rm(dir, { recursive: true, force: true })

@@ -1,7 +1,7 @@
 import path from "node:path"
 
 import {
-  CLOTHAID_DIR,
+  ETYMD_DIR,
   deriveProfile,
   readBaseline,
   writeCachedFacts,
@@ -10,9 +10,9 @@ import {
 import { scanProject } from "../core/scan.js"
 import { pathExists } from "../core/util.js"
 import type { ProjectFacts } from "../core/types.js"
-import { contractDriftLens } from "../lenses/contract-drift.js"
+import { contextEconomyLens } from "../lenses/context-economy.js"
 import { gateIntegrityLens } from "../lenses/gate-integrity/lens.js"
-import { maturityLens } from "../lenses/maturity.js"
+import { instructionTruthLens } from "../lenses/instruction-truth/lens.js"
 import {
   rankFindings,
   type Finding,
@@ -31,7 +31,7 @@ import {
 } from "./ledger.js"
 
 /** The lens registry — adding a lens means registering it here. */
-export const LENSES: Lens[] = [contractDriftLens, gateIntegrityLens, maturityLens]
+export const LENSES: Lens[] = [instructionTruthLens, gateIntegrityLens, contextEconomyLens]
 
 export interface AuditOptions {
   /** Restrict to one kind (doctor = truth). */
@@ -56,8 +56,8 @@ export interface AuditResult {
 export async function runAudit(root: string, opts: AuditOptions = {}): Promise<AuditResult> {
   const facts = await scanProject(root)
   // A read-only audit of a repo that never opted in must leave zero trace — only cache where
-  // .clothaid/ already exists or this run is allowed to persist anyway.
-  if ((opts.persistLedger ?? true) || (await pathExists(path.join(root, CLOTHAID_DIR)))) {
+  // .etymd/ already exists or this run is allowed to persist anyway.
+  if ((opts.persistLedger ?? true) || (await pathExists(path.join(root, ETYMD_DIR)))) {
     await writeCachedFacts(root, facts)
   }
   const baseline = await readBaseline(root)

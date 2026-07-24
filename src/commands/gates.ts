@@ -2,7 +2,6 @@ import { cancel, confirm, isCancel } from "@clack/prompts"
 
 import { applyFiles } from "../core/apply.js"
 import { planWorkflow } from "../core/generate.js"
-import { defaultLeash } from "../core/leash.js"
 import { scanProject } from "../core/scan.js"
 import { git } from "../core/util.js"
 import { print, renderPlan, section } from "../ui/render.js"
@@ -47,11 +46,7 @@ export async function run(opts: GatesOptions): Promise<void> {
     }
   }
 
-  const files = await planWorkflow(opts.cwd, facts, defaultLeash(facts), {
-    adapters: [],
-    gates: true,
-    state: false,
-  })
+  const files = await planWorkflow(opts.cwd, facts, { agents: false, gates: true })
   const gateFiles = files.filter((f) => f.executable)
   renderPlan(gateFiles)
 

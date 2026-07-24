@@ -35,7 +35,7 @@ export interface LedgerDiff {
 }
 
 export function ledgerPath(root: string): string {
-  return path.join(root, ".clothaid", "ledger.json")
+  return path.join(root, ".etymd", "ledger.json")
 }
 
 export async function readLedger(root: string): Promise<Ledger> {

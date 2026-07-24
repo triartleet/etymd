@@ -17,7 +17,11 @@ export interface AuditOptions {
   lens?: string
   /** Do not persist the reconciled ledger (read-only report). */
   noLedger?: boolean
+  /** Exit non-zero when a finding at (or above) this tier exists — the CI gate. */
+  failOn?: "risk" | "gap" | "polish"
 }
+
+const TIER_RANK = { risk: 0, gap: 1, polish: 2 } as const
 
 export async function run(opts: AuditOptions): Promise<void> {
   const result = await runAudit(opts.cwd, {
@@ -25,6 +29,13 @@ export async function run(opts: AuditOptions): Promise<void> {
     lensIds: opts.lens ? [opts.lens] : undefined,
     persistLedger: !opts.noLedger,
   })
+
+  if (opts.failOn) {
+    const threshold = TIER_RANK[opts.failOn]
+    if (result.findings.some((f) => TIER_RANK[f.tier] <= threshold)) {
+      process.exitCode = 1
+    }
+  }
 
   if (opts.json) {
     print(
@@ -56,7 +67,7 @@ export async function run(opts: AuditOptions): Promise<void> {
   )
   if (!result.baseline && !opts.truth) {
     print(
-      `  ${theme.dim("no committed baseline — run `clothaid init` to approve one; drift checks are limited")}`,
+      `  ${theme.dim("no committed baseline — run `etymd init` to approve one; drift checks are limited")}`,
     )
   }
 

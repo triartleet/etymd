@@ -16,7 +16,7 @@ export interface Finding {
   evidence: string[]
   /** The concrete cost of NOT acting. */
   why: string
-  /** What to do about it (may name a clothaid command as the fix). */
+  /** What to do about it (may name a etymd command as the fix). */
   action?: string
   effort: Effort
   confidence: Confidence

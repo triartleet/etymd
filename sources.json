@@ -1,5 +1,5 @@
 {
-  "$comment": "Corpus manifest — local sibling projects clothaid distils its knowledge pack from and validates against (dogfood diff harness). See docs/design/v0.0.1-design.md §2/§10.",
+  "$comment": "Corpus manifest — local sibling projects etymd distils its knowledge pack from and validates against (dogfood diff harness). See docs/design/v0.0.1-design.md §2/§10.",
   "sources": [
     {
       "name": "pepshop",

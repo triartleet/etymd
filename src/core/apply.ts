@@ -10,7 +10,7 @@ export interface ApplyResult {
 
 /**
  * Write a planned file set. Idempotent by default: an existing file is skipped unless `overwrite`
- * names it — clothaid never clobbers hand-authored contracts without consent.
+ * names it — etymd never clobbers hand-authored contracts without consent.
  */
 export async function applyFiles(
   root: string,

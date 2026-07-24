@@ -73,7 +73,7 @@ export async function scanProject(root: string): Promise<ProjectFacts> {
     : undefined
 
   return {
-    clothaidVersion: VERSION,
+    etymdVersion: VERSION,
     packVersion: PACK_VERSION,
     generatedAt: new Date().toISOString(),
     root: abs,

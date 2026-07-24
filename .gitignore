@@ -7,4 +7,4 @@ coverage/
 .env
 .env.*
 !.env.example
-.clothaid/
+.etymd/cache/

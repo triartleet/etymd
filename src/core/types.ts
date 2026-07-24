@@ -1,5 +1,5 @@
 // The shared vocabulary of a "reckoning": the deterministic facts a scan produces, the maturity
-// score derived from them, and the leash policy that parameterises what clothaid generates.
+// score derived from them, and the leash policy that parameterises what etymd generates.
 
 export type PackageManager = "pnpm" | "yarn" | "npm" | "bun" | "unknown"
 
@@ -28,7 +28,7 @@ export interface PackageInfo {
   version?: string
 }
 
-/** An agent-workflow artifact clothaid knows how to read or generate. */
+/** An agent-workflow artifact etymd knows how to read or generate. */
 export interface DetectedArtifact {
   id: string
   label: string
@@ -62,7 +62,7 @@ export interface HookFacts {
 }
 
 export interface ProjectFacts {
-  clothaidVersion: string
+  etymdVersion: string
   packVersion: string
   generatedAt: string
   root: string
@@ -88,71 +88,6 @@ export interface ProjectFacts {
     /** True when the file count hit the walk cap (large repo). */
     truncated: boolean
   }
-}
-
-export type ScoreLevel = "present" | "partial" | "absent"
-
-export interface ScoreDimension {
-  id: string
-  label: string
-  level: ScoreLevel
-  detail: string
-  /** What to do about it when it is not `present`. */
-  recommendation?: string
-}
-
-export interface Scorecard {
-  /** The workflow profile the rubric was applied under (team drops the solo-ritual dimensions). */
-  profile: "solo" | "team"
-  dimensions: ScoreDimension[]
-  /** 0–100. */
-  score: number
-  /** Suggested setup mode given the current maturity. */
-  suggestedMode: SetupMode
-}
-
-export type SetupMode = "fresh" | "migration" | "optimisation"
-
-/** A constraint that is org-mandated (hard) reads differently from a preference (soft). */
-export interface LeashPolicy {
-  enabled: boolean
-  hard: boolean
-}
-
-/** The operational constraints that parameterise the generated contract. */
-export interface LeashProfile {
-  autonomy: {
-    runCommands: boolean
-    commitUnasked: boolean
-    pushUnasked: boolean
-    openPrs: boolean
-    network: boolean
-  }
-  tooling: {
-    ghCli: LeashPolicy
-    mcpServers: LeashPolicy
-    /** Jira/Confluence-style ticket APIs blocked → agent delivers paste-ready drafts for tickets. */
-    ticketApiBlocked: boolean
-  }
-  vcs: {
-    branchConvention?: string
-    commitConvention?: string
-    /** Jira project key when changes are ticket-linked (e.g. "NGRE2E"). */
-    ticketKey?: string
-    ticketLinked: boolean
-    /** Agent attribution in commits (Co-authored-by / "Generated with") allowed or banned. */
-    attribution: "none" | "allowed"
-  }
-  deps: {
-    exactPinning: boolean
-  }
-  scope: {
-    minimalDiffs: boolean
-    stayInScope: boolean
-  }
-  /** Integrations that exist in the repo but must not be proposed (e.g. a disabled Smartling). */
-  disabledIntegrations: string[]
-  notes: string[]
 }
 
 export interface ContextFile {

@@ -1,108 +1,112 @@
-# clothaid
+# etymd
 
-**Agent-agnostic agentic-workflow CLI.** Run it inside a project to _reckon_ it and install,
-migrate, or optimise a disciplined AI-agent workflow — one source-of-truth operating contract with
-thin per-agent adapters (Claude Code, Cursor, Copilot) — then keep it honest: ranked,
-evidence-cited audit findings with a persistent ledger, drift measured against a committed
-baseline, and context-budget accounting.
+**Keep your agent instructions true.**
 
-Distilled from a production workflow refined over 120+ agent sessions and validated against a
-corpus of real repositories (its detectors are corpus-tested).
+Your `AGENTS.md` is the interface between your team and every coding agent — and it rots silently.
+Scripts get renamed, directories move, rules go stale, and the file keeps instructing agents with
+confidence. etymd continuously **verifies the agent context layer against the actual repo**:
 
-> **Why "agent-agnostic"?** clothaid writes **one** contract (`AGENTS.md`) and generates thin
-> pointer files for each agent. Every assistant reads the same rules; you never maintain three
-> divergent instruction sets.
+```
+$ etymd audit
 
-**Status:** pre-publish. The npm release is deliberately held until the foundation has proven
-itself in daily use; the versioning/publish infra is ready.
+  RISK   AGENTS.md tells agents to run `pnpm dev` — no such script exists
+         evidence  AGENTS.md: `pnpm dev` · package.json scripts
+         action    Update the instruction to the current script name.
 
-## Install (once published)
+  GAP    AGENTS.md references `src/legacy/` — it does not exist in the repo
+  GAP    Type checking is enforced only in CI — no local hook runs it
+  GAP    AGENTS.md loads 13,809 words (~18k tokens) into every session
 
-```bash
-npx clothaid init
-# or
-npm i -D clothaid
+  since last audit: 1 new · 3 still open · 1 resolved · 1 REGRESSED
 ```
 
-Requires Node ≥ 18.17. Until then: `npm run build && node dist/cli.js …` from a checkout.
+_From Greek **étymon** — a word's true, original sense (→ etymology) — clipped to **etym.** + the
+**.md** family it guards._
+
+## Why this exists
+
+- Instruction files are now load-bearing: 20+ agents (Claude Code, Codex, Cursor, Copilot,
+  Gemini, …) read `AGENTS.md` natively. A stale claim doesn't error — it silently misleads every
+  session.
+- Linters exist for these files, but they check **a point in time**. Truth is a property **over
+  time**: etymd measures drift against a **committed baseline**, remembers findings in a
+  **ledger** (fixed things stay fixed; a returning problem is named a _regression_, and a finding
+  you dismissed with a reason never resurfaces), and gates CI on it.
+- **Honesty is structural.** Every report declares what it could NOT see — CI jobs inherited from
+  unreadable org templates, server-side quality-gate thresholds, skipped heuristics. No guess is
+  ever dressed as a fact.
 
 ## Quick start
 
 ```bash
 cd your-project
-clothaid init      # interactive: reckon → score → mode → leash → plan → apply → baseline
-clothaid audit     # ranked, evidence-cited findings across every lens + the ledger diff
+npx etymd init          # approve the baseline (+ scaffold AGENTS.md only if you have none)
+npx etymd audit         # verify every instruction claim against the repo
+npx etymd audit --fail-on risk   # the CI gate
 ```
 
-`init` scans the project, shows a maturity scorecard, confirms your workflow profile (solo/team),
-lets you pick a setup mode and the leash (operational constraints), previews every file, and only
-writes on your confirmation — a hand-edited file is never silently overwritten. It finishes by
-writing the **committed baseline** (`.clothaid/baseline.json`) that drift is measured against.
+Requires Node ≥ 18.17. **Status: pre-publish** — run from a checkout (`npm run build &&
+node dist/cli.js …`) until the first npm release.
+
+## What it checks
+
+**`instruction-truth`** — over `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, Copilot instructions,
+`.cursor/rules/*`, `.clinerules`, `.claude/skills/*/SKILL.md`:
+
+- **Command claims** — every `pnpm X` / `npm run X` the files tell agents to run must exist in
+  `package.json` scripts.
+- **Path claims** — every repo path the files point at must exist (conservative heuristics; what's
+  skipped is disclosed).
+- **Package-manager consistency** — instructions must not command `yarn` in a `pnpm` repo.
+- **Cross-references** — pointer chains (`CLAUDE.md` → `AGENTS.md` → state docs) must resolve.
+- **Drift vs baseline** — documented commands/artifacts/layout that existed at approval and are
+  now gone.
+
+**`gate-integrity`** — a CI config is a claim too: checks enforced only in CI (failures surface a
+slow pipeline after the agent finished — `etymd gates` generates the local mirror), checks only in
+skippable local hooks, latent gaps (coverage collected but nothing gates on it; commitlint
+installed but unwired). `allow_failure` jobs count as advisory, never as gates.
+
+**`context-economy`** — the always-loaded footprint in words/tokens (only genuinely
+`alwaysApply` Cursor rules count), flagging files worth extracting into on-demand skills. Context
+is the dominant cost of the loop; a lean contract is a correctness feature.
 
 ## Commands
 
-| Command            | What it does                                                                                                                                  |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `clothaid init`    | Reckon + install/migrate/optimise the workflow (interactive). `-y` = defaults, never overwrites.                                              |
-| `clothaid scan`    | Deterministic reckoning → the `.clothaid` cache. `--json` to print it.                                                                        |
-| `clothaid score`   | Maturity scorecard (profile-aware) + suggested setup mode.                                                                                    |
-| `clothaid audit`   | All lenses: ranked findings (risk → gap → polish) + lens coverage + ledger diff. `--lens gate-integrity`, `--truth`, `--json`, `--no-ledger`. |
-| `clothaid doctor`  | Alias for `audit --truth` — "is the recorded reckoning still true?"                                                                           |
-| `clothaid context` | Always-loaded context footprint (Cursor-scoped-rule aware) + extraction candidates.                                                           |
-| `clothaid brief`   | Grounded briefing your in-repo agent completes. `--human` for onboarding.                                                                     |
-| `clothaid gates`   | Install the free local git-hook gates (process → pre-commit, correctness → pre-push).                                                         |
+| Command         | What it does                                                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `etymd audit`   | Verify every claim; ranked findings (risk → gap → polish) + ledger diff. `--lens`, `--truth`, `--json`, `--no-ledger`, `--fail-on <tier>`. |
+| `etymd init`    | Onboard: approve the committed baseline; scaffold a minimal AGENTS.md **only if missing**. Never overwrites.                               |
+| `etymd doctor`  | Alias for `audit --truth`.                                                                                                                 |
+| `etymd context` | The economy view: per-file always-loaded footprint + extraction candidates.                                                                |
+| `etymd gates`   | Install local git-hook gates (pre-commit / pre-push) built from your own check scripts.                                                    |
+| `etymd scan`    | The deterministic reckoning behind everything. `--json`.                                                                                   |
+| `etymd brief`   | A grounded briefing your in-repo agent completes to author the semantic layer.                                                             |
 
-Run against another directory with `--cwd <dir>`. Full guide: [`docs/usage.md`](docs/usage.md).
-Design record: [`docs/design/`](docs/design/) (001 founding · 002 foundation re-lock).
+`--cwd <dir>` targets another directory. Read-only probing of any repo leaves **zero trace**
+(`audit --no-ledger` writes nothing).
 
-## The audit engine
+## The files etymd keeps
 
-`clothaid audit` runs **lenses** over the reckoning and reports through one finding schema —
-claim · evidence (file/job) · why it matters · action · effort · confidence — ranked risk → gap →
-polish, cheapest first. Every report declares its own coverage: which lenses ran, what they could
-NOT see (inherited CI templates, server-side thresholds), and why. Findings persist in a
-**committed ledger**: re-runs show new / resolved / regressed, and a finding you dismissed with a
-reason never resurfaces.
-
-Shipping lenses:
-
-- **contract-drift** (truth) — commands, artifacts, and layout vs the committed baseline.
-- **gate-integrity** — the CI ↔ local gate inventory: checks enforced only in CI (failures surface
-  one slow pipeline after push — `clothaid gates` is the paired fix), checks only in skippable
-  local hooks, and latent gaps (coverage collected but nothing local gates on it; commitlint
-  installed but unwired). `allow_failure` jobs count as advisory, never as gates.
-- **maturity** — the rubric's gaps as actionable findings.
-
-## What `init` installs
-
-- **`AGENTS.md`** — the single source of truth: stack, the leash (working rules incl. hard org
-  policy vs soft preference), an advisory repo map with its re-verify command, composition-point
-  and conventions scaffolds, the definition of done (from your real scripts), a session protocol.
-- **Per-agent adapters** — `CLAUDE.md`, `.cursor/rules/agents.mdc`, `.github/copilot-instructions.md`.
-- **`PROJECT_CONTEXT.md`** _(optional)_ — a read-first ground-truth state doc.
-- **Local gates** _(optional)_ — tracked `.githooks/` + `core.hooksPath`: a process gate at
-  pre-commit and a correctness gate at pre-push built from your own check commands (a writing
-  command can never enter the gate).
-- **`.clothaid/baseline.json`** — the approved reckoning (commit it); the scan cache stays
-  gitignored.
-
-## The reckoning is agent-orchestrated
-
-The deterministic scan gathers facts; the _semantic_ layer (composition points, reuse inventory,
-conventions, "what this project is") is completed by the agent already in your repo. `clothaid
-brief` writes the grounded briefing; you point your agent at it; you approve the result before it
-becomes the contract. No API keys, and it dogfoods the very workflow it installs — as does this
-repo itself (see its `AGENTS.md`).
+| Path                   | Lifecycle     | Role                                             |
+| ---------------------- | ------------- | ------------------------------------------------ |
+| `.etymd/baseline.json` | **committed** | the approved reckoning drift is measured against |
+| `.etymd/ledger.json`   | **committed** | the findings memory: statuses, diffs, dismissals |
+| `.etymd/cache/`        | gitignored    | transient scan cache                             |
 
 ## Programmatic use
 
 ```ts
-import { scanProject, scoreProject, runAudit } from "clothaid"
+import { runAudit } from "etymd"
 
-const facts = await scanProject(process.cwd())
 const audit = await runAudit(process.cwd(), { persistLedger: false })
-console.log(audit.findings[0])
+console.log(audit.findings) // one schema: claim · evidence · why · action · effort · confidence
 ```
+
+## Design record
+
+[`docs/design/`](docs/design/) — 001 founding · 002 foundation re-lock · **003 the truth-guard
+pivot** (the current identity; includes the state-of-the-field investigation it rests on).
 
 ## License
 

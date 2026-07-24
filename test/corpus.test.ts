@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest"
 
 import { scanProject } from "../src/core/scan.js"
 import { buildGateInventory } from "../src/lenses/gate-integrity/inventory.js"
+import { instructionTruthLens } from "../src/lenses/instruction-truth/lens.js"
 
 // Read-only smoke tests over the sibling corpus repos — the dogfood harness. Each asserts only
 // durable, hand-verified facts; skipped cleanly on machines without the corpus.
@@ -23,6 +24,17 @@ describe.skipIf(!hasRepo("pepshop"))("corpus: pepshop (control — the gold stan
     expect(facts.commands.formatCheck).toBe("format:check")
     expect(facts.artifacts.find((a) => a.id === "agents")?.exists).toBe(true)
     expect(facts.artifacts.find((a) => a.id === "failure-modes-skill")?.exists).toBe(true)
+  })
+
+  it("runs the truth lens read-only over the real contract + skills without throwing", async () => {
+    const root = repo("pepshop")
+    const facts = await scanProject(root)
+    const report = await instructionTruthLens.run({ root, facts, profile: "solo", baseline: null })
+    expect(report.status).toBe("ran")
+    // The instruction set includes AGENTS.md + CLAUDE.md + skills — several files, all checked.
+    expect(report.disclosures.some((d) => /Checked \d+ instruction file/.test(d))).toBe(true)
+    // Findings may legitimately exist (repos evolve); every one must carry evidence.
+    for (const f of report.findings) expect(f.evidence.length).toBeGreaterThan(0)
   })
 })
 

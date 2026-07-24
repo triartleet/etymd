@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# clothaid: correctness gate. Mirrors CI cheapest-first; blocks the push on any failure.
+# etymd: correctness gate. Mirrors CI cheapest-first; blocks the push on any failure.
 echo "› npm run format:check"
 npm run format:check || exit 1
 echo "› npm run typecheck"

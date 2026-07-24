@@ -10,14 +10,14 @@ import { readJson } from "./util.js"
 // - baseline.json    — COMMITTED: the approved reckoning drift is measured against. Written at
 //   init (approval time), pack-versioned. Doctor/audit truth-lenses compare tree vs baseline,
 //   never vs the last peek — otherwise looking at the project resets what "drift" means.
-export const CLOTHAID_DIR = ".clothaid"
-export const CACHE_DIR = path.join(CLOTHAID_DIR, "cache")
+export const ETYMD_DIR = ".etymd"
+export const CACHE_DIR = path.join(ETYMD_DIR, "cache")
 export const CACHE_FACTS_FILE = path.join(CACHE_DIR, "facts.json")
-export const BASELINE_FILE = path.join(CLOTHAID_DIR, "baseline.json")
+export const BASELINE_FILE = path.join(ETYMD_DIR, "baseline.json")
 
 export interface Baseline {
   packVersion: string
-  clothaidVersion: string
+  etymdVersion: string
   approvedAt: string
   profile: WorkflowProfile
   facts: ProjectFacts

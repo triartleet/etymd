@@ -49,7 +49,7 @@ export async function git(root: string, args: string[]): Promise<string | null> 
   }
 }
 
-/** Prose word count — the unit clothaid measures contract weight in (stable across tokenizers). */
+/** Prose word count — the unit etymd measures contract weight in (stable across tokenizers). */
 export function wordCount(text: string): number {
   const m = text.trim().match(/\S+/g)
   return m ? m.length : 0

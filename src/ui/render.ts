@@ -2,7 +2,7 @@ import pc from "picocolors"
 
 import type { Finding, LensReport } from "../engine/finding.js"
 import type { LedgerDiff } from "../engine/ledger.js"
-import type { ContextBudget, ProjectFacts, Scorecard, ScoreLevel } from "../core/types.js"
+import type { ContextBudget, ProjectFacts } from "../core/types.js"
 import { glyph, theme } from "./theme.js"
 
 /** Strip ANSI so column widths measure printable length, not escape codes. */
@@ -33,35 +33,6 @@ export function keyValues(rows: [string, string][]): void {
   const keyWidth = maxWidth(rows.map(([k]) => k))
   for (const [k, v] of rows) {
     print(`  ${theme.dim(pad(k, keyWidth))}  ${v}`)
-  }
-}
-
-const LEVEL_GLYPH: Record<ScoreLevel, string> = {
-  present: glyph.ok,
-  partial: glyph.partial,
-  absent: glyph.bad,
-}
-
-/** A horizontal score meter, e.g. ████████░░░░  67%. */
-export function meter(score: number, cols = 24): string {
-  const filled = Math.round((score / 100) * cols)
-  const colour = score >= 70 ? theme.ok : score >= 40 ? theme.warn : theme.bad
-  const bar = colour("█".repeat(filled)) + theme.dim("░".repeat(cols - filled))
-  return `${bar}  ${colour(`${score}%`)}`
-}
-
-export function renderScorecard(card: Scorecard): void {
-  section(`Maturity ${theme.dim(`(${card.profile} profile)`)}`)
-  print(`  ${meter(card.score)}`)
-  print()
-  const labelWidth = maxWidth(card.dimensions.map((d) => d.label))
-  for (const d of card.dimensions) {
-    print(`  ${LEVEL_GLYPH[d.level]}  ${pad(d.label, labelWidth)}  ${theme.dim(d.detail)}`)
-  }
-  const recs = card.dimensions.filter((d) => d.level !== "present" && d.recommendation)
-  if (recs.length) {
-    section("Recommendations")
-    for (const d of recs) print(`  ${glyph.arrow} ${d.recommendation}`)
   }
 }
 

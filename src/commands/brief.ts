@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
-import { CLOTHAID_DIR } from "../core/facts.js"
+import { ETYMD_DIR } from "../core/facts.js"
 import { scanProject } from "../core/scan.js"
 import type { ProjectFacts } from "../core/types.js"
 import { print } from "../ui/render.js"
@@ -15,7 +15,7 @@ export interface BriefOptions {
 export async function run(opts: BriefOptions): Promise<void> {
   const facts = await scanProject(opts.cwd)
   const contents = opts.human ? humanBrief(facts) : agentBrief(facts)
-  const rel = path.join(CLOTHAID_DIR, opts.human ? "onboarding.md" : "brief.md")
+  const rel = path.join(ETYMD_DIR, opts.human ? "onboarding.md" : "brief.md")
   const target = path.join(opts.cwd, rel)
   await fs.mkdir(path.dirname(target), { recursive: true })
   await fs.writeFile(target, contents, "utf8")
@@ -53,7 +53,7 @@ ${dirs || "- (single package)"}`
 function agentBrief(facts: ProjectFacts): string {
   return `# Reckoning brief — ${facts.name}
 
-You are completing the **semantic half** of this project's operating contract. clothaid has already
+You are completing the **semantic half** of this project's operating contract. etymd has already
 gathered the deterministic facts below. Your job is to fill in what only reading the code reveals.
 Ground every answer in real files; cite paths. Do not invent structure. When unsure, say so.
 
