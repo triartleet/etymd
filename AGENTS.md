@@ -65,6 +65,7 @@ over repo-wide scans.
   (read-only sibling-repo smokes)
 - `docs/design/` — the design record (001 founding · 002 foundation re-lock · 003 truth-guard
   pivot — the current identity)
+- `ROADMAP.md` — now/next/later, the pre-publish checklist, accepted heuristic trade-offs
 
 ## Composition points
 

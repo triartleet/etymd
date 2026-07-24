@@ -103,10 +103,12 @@ const audit = await runAudit(process.cwd(), { persistLedger: false })
 console.log(audit.findings) // one schema: claim · evidence · why · action · effort · confidence
 ```
 
-## Design record
+## Design record & roadmap
 
 [`docs/design/`](docs/design/) — 001 founding · 002 foundation re-lock · **003 the truth-guard
 pivot** (the current identity; includes the state-of-the-field investigation it rests on).
+[`ROADMAP.md`](ROADMAP.md) — what's now / next / later, the pre-publish checklist, and the
+accepted heuristic trade-offs.
 
 ## License
 
