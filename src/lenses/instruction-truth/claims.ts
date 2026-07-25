@@ -162,6 +162,19 @@ export function extractCommandClaims(text: string): CommandClaims {
 
 const PATH_TOKEN_RE = /^[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.$-]+)+\/?$/
 
+// A file claim needs a RECOGNIZED extension, not just a dot suffix: Better-Auth hook notation
+// (`create/update.after`) reads as slash-joined prose with a dotted stage, and any bare
+// "ends in .xyz" rule accuses it. Unknown extensions fall back to prose — precision over recall.
+const KNOWN_EXTENSIONS = new Set([
+  ...(
+    "ts tsx cts mts js jsx cjs mjs json jsonc json5 md mdx mdc yml yaml toml ini cfg conf " +
+    "env sh bash zsh fish ps1 bat cmd css scss sass less html htm xml svg sql prisma graphql " +
+    "gql proto py rb rs go java kt kts swift c h cc cpp hpp cs php vue svelte astro txt log " +
+    "lock csv tsv png jpg jpeg gif webp ico avif woff woff2 ttf otf wasm map pem key crt tf " +
+    "tfvars example sample local snap ejs hbs pug"
+  ).split(" "),
+])
+
 /**
  * Repo-relative path claims from single-token inline spans, conservatively filtered. The
  * load-bearing precision rule (learned from real corpus prose): an extensionless bare token
@@ -187,8 +200,8 @@ export function extractPathClaims(text: string): string[] {
     // A $-placeholder segment (TanStack-style `/p/$slug`) is a route pattern, not a file claim.
     if (token.split("/").some((seg) => seg.startsWith("$"))) continue
     const isDirClaim = token.endsWith("/")
-    const hasExtension = /\.[a-z0-9]{1,5}$/i.test(token)
-    if (!isDirClaim && !hasExtension) continue
+    const ext = token.toLowerCase().match(/\.([a-z0-9]{1,8})$/)?.[1]
+    if (!isDirClaim && !(ext && KNOWN_EXTENSIONS.has(ext))) continue
     out.add(token.replace(/\/$/, ""))
   }
   return [...out]

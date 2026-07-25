@@ -5,6 +5,7 @@ import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { scanProject } from "../src/core/scan.js"
+import { git } from "../src/core/util.js"
 import { extractCommandClaims, extractPathClaims } from "../src/lenses/instruction-truth/claims.js"
 import { instructionTruthLens } from "../src/lenses/instruction-truth/lens.js"
 import { contextEconomyLens, TOTAL_BUDGET_WORDS } from "../src/lenses/context-economy.js"
@@ -66,6 +67,9 @@ describe("claim extraction", () => {
         "Routes live at `/admin/batches` and `~/home` and `@scope/pkg`.",
         "Globs like `src/**/*.ts` and urls `https://x.dev/a/b` and `$VAR/x` are skipped.",
         "Route params `p/$slug` are skipped.",
+        // Dotted prose is not a file claim: Better-Auth hook notation from the pepshop corpus.
+        "Hooks fire on `create/update.after` once an address is proven.",
+        "Unrecognized extensions like `pkg/mod.xyz9` stay prose.",
       ].join("\n"),
     )
     expect(paths.sort()).toEqual(["docs/design", "src/core/detect.ts"])
@@ -82,6 +86,8 @@ describe("instruction-truth lens (the lying-AGENTS.md fixture)", () => {
       }),
     )
     await write("pnpm-lock.yaml", "")
+    // node_modules is installed: unknown commands are checkable (script or binary — neither).
+    await write("node_modules/.bin/.keep", "")
     await write("src/real.ts", "export {}\n")
     await write(
       "AGENTS.md",
@@ -155,9 +161,49 @@ describe("instruction-truth lens (the lying-AGENTS.md fixture)", () => {
     expect(report.findings).toEqual([])
   })
 
+  it("treats an installed .bin binary as a true command, not a stale script", async () => {
+    await write("package.json", JSON.stringify({ name: "nxish", scripts: { build: "nx build" } }))
+    await write("pnpm-lock.yaml", "")
+    await write("node_modules/.bin/nx", "#!/bin/sh\n")
+    await write("AGENTS.md", "# AGENTS.md\n\nInspect the graph with `pnpm nx graph`.\n")
+    const report = await runTruth()
+    expect(report.findings.map((f) => f.id)).toEqual([])
+    expect(report.disclosures.some((d) => d.includes("installed binaries"))).toBe(true)
+  })
+
+  it("skips (does not flag) unknown commands when node_modules is absent", async () => {
+    await write("package.json", JSON.stringify({ name: "uninstalled", scripts: { test: "jest" } }))
+    await write("pnpm-lock.yaml", "")
+    await write("AGENTS.md", "# AGENTS.md\n\nRun `pnpm nx build` for the app.\n")
+    const report = await runTruth()
+    // `nx` might be an uninstalled binary — we cannot know, so we must not accuse.
+    expect(report.findings.map((f) => f.id)).toEqual([])
+    expect(report.disclosures.some((d) => d.includes("node_modules is not installed"))).toBe(true)
+  })
+
+  it("skips gitignored path claims (machine-local) instead of accusing them", async () => {
+    await write("package.json", JSON.stringify({ name: "envy", scripts: {} }))
+    await write("pnpm-lock.yaml", "")
+    await write("node_modules/.bin/.keep", "")
+    await write(".gitignore", "apps/api/.env\n")
+    await write(
+      "AGENTS.md",
+      "# AGENTS.md\n\nNeeds `apps/api/.env` locally. Helpers in `apps/api/gone.ts`.\n",
+    )
+    await git(dir, ["init"])
+    const report = await runTruth()
+    const ids = report.findings.map((f) => f.id)
+    // The corpus case: a skill honestly says a gitignored file is "present on this machine" —
+    // its absence in a fresh checkout is not a lie.
+    expect(ids).not.toContain("instruction-truth/stale-path:AGENTS.md:apps/api/.env")
+    expect(ids).toContain("instruction-truth/stale-path:AGENTS.md:apps/api/gone.ts")
+    expect(report.disclosures.some((d) => d.includes("gitignored"))).toBe(true)
+  })
+
   it("covers cursor rules and skills files too", async () => {
     await write("package.json", JSON.stringify({ name: "multi", scripts: {} }))
     await write("pnpm-lock.yaml", "")
+    await write("node_modules/.bin/.keep", "")
     await write(".cursor/rules/build.mdc", "Run `pnpm compile` before review.\n")
     await write(".claude/skills/deploy/SKILL.md", "See `scripts/deploy.sh` for the steps.\n")
     const report = await runTruth()

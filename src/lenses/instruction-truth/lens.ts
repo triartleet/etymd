@@ -3,7 +3,7 @@ import path from "node:path"
 import { PACK_VERSION } from "../../pack/version.js"
 import type { Finding, Lens, LensContext, LensReport } from "../../engine/finding.js"
 import type { ProjectFacts } from "../../core/types.js"
-import { pathExists, readJson } from "../../core/util.js"
+import { git, pathExists, readJson } from "../../core/util.js"
 import {
   extractCommandClaims,
   extractDocRefs,
@@ -138,8 +138,23 @@ export const instructionTruthLens: Lens = {
       }
       return false
     }
+    // `yarn X` / `pnpm X` (and their `run` forms) legitimately execute an installed
+    // node_modules/.bin binary, not only a package script — `yarn nx` in an Nx repo is true.
+    // Without an installed node_modules we cannot tell a stale script from a valid binary,
+    // so unknown commands are then skipped and disclosed, never accused.
+    const binResolves = async (name: string): Promise<boolean> => {
+      const bases = [root, ...facts.packages.map((p) => path.join(root, p.dir))]
+      for (const base of bases) {
+        if (await pathExists(path.join(base, "node_modules", ".bin", name))) return true
+      }
+      return false
+    }
+    const nodeModulesInstalled = await pathExists(path.join(root, "node_modules"))
 
     let totalFilteredSkipped = 0
+    let binaryResolved = 0
+    let unverifiableCommands = 0
+    let gitignoredSkipped = 0
 
     for (const file of files) {
       // Command claims: a script the file tells agents to run must exist somewhere real.
@@ -147,6 +162,14 @@ export const instructionTruthLens: Lens = {
       totalFilteredSkipped += filteredSkipped
       for (const [script, raw] of claimed) {
         if (knownScripts.has(script)) continue
+        if (await binResolves(script)) {
+          binaryResolved += 1
+          continue
+        }
+        if (!nodeModulesInstalled) {
+          unverifiableCommands += 1
+          continue
+        }
         findings.push(
           finding({
             id: `${LENS_ID}/stale-command:${file.path}:${script}`,
@@ -163,9 +186,21 @@ export const instructionTruthLens: Lens = {
 
       // Path claims: a path the file points agents at must exist.
       const paths = extractPathClaims(file.text)
-      let pathFindings = 0
+      const missing: string[] = []
       for (const claim of paths) {
-        if (await pathResolves(claim)) continue
+        if (!(await pathResolves(claim))) missing.push(claim)
+      }
+      // A gitignored claim (`.env`, local caches) is machine-local by design: absence in THIS
+      // checkout does not make the instruction false — unverifiable, so skipped, never accused.
+      // check-ignore exits non-zero when nothing matches; git() maps that to null.
+      const ignoredOut = missing.length ? await git(root, ["check-ignore", ...missing]) : null
+      const gitignored = new Set((ignoredOut ?? "").split("\n").filter(Boolean))
+      let pathFindings = 0
+      for (const claim of missing) {
+        if (gitignored.has(claim)) {
+          gitignoredSkipped += 1
+          continue
+        }
         if (pathFindings >= MAX_PATH_FINDINGS_PER_FILE) {
           disclosures.push(
             `${file.path}: more than ${MAX_PATH_FINDINGS_PER_FILE} missing-path claims — truncated.`,
@@ -245,8 +280,23 @@ export const instructionTruthLens: Lens = {
       )
     }
 
+    if (binaryResolved) {
+      disclosures.push(
+        `${binaryResolved} command claim(s) are installed binaries (node_modules/.bin), not package scripts — treated as true.`,
+      )
+    }
+    if (unverifiableCommands) {
+      disclosures.push(
+        `node_modules is not installed — ${unverifiableCommands} command claim(s) matching no package script could not be checked against installed binaries; skipped, not flagged.`,
+      )
+    }
+    if (gitignoredSkipped) {
+      disclosures.push(
+        `${gitignoredSkipped} missing path claim(s) are gitignored (machine-local, e.g. .env) — existence is not verifiable from the repo; skipped, not flagged.`,
+      )
+    }
     disclosures.push(
-      `Checked ${files.length} instruction file(s); scripts resolved against root + ${facts.packages.length} workspace manifest(s); paths matched against root and package roots. Heuristics: workspace-filtered commands skipped (${totalFilteredSkipped}); extensionless bare tokens treated as prose (a dir claim needs a trailing slash); absolute/globbed/placeholder tokens skipped; framework-pattern staleness not checked.`,
+      `Checked ${files.length} instruction file(s); commands resolved against root + ${facts.packages.length} workspace manifest(s) plus installed binaries; paths matched against root and package roots. Heuristics: workspace-filtered commands skipped (${totalFilteredSkipped}); tokens without a recognized extension treated as prose (a dir claim needs a trailing slash); gitignored claims unverifiable; absolute/globbed/placeholder tokens skipped; framework-pattern staleness not checked.`,
     )
 
     return {
