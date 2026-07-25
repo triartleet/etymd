@@ -32,7 +32,11 @@ export interface LedgerDiff {
   regressed: Finding[]
   resolved: LedgerEntry[]
   dismissed: Finding[]
+  accepted: Finding[]
 }
+
+/** Human-set resolutions, applied by `etymd dismiss` / `etymd accept`. */
+export type HumanResolution = "dismissed" | "accepted"
 
 export function ledgerPath(root: string): string {
   return path.join(root, ".etymd", "ledger.json")
@@ -63,7 +67,14 @@ export function reconcileLedger(
 } {
   const byId = new Map(ledger.entries.map((e) => [e.id, e]))
   const seen = new Set<string>()
-  const diff: LedgerDiff = { new: [], stillOpen: [], regressed: [], resolved: [], dismissed: [] }
+  const diff: LedgerDiff = {
+    new: [],
+    stillOpen: [],
+    regressed: [],
+    resolved: [],
+    dismissed: [],
+    accepted: [],
+  }
   const entries: LedgerEntry[] = []
 
   for (const f of findings) {
@@ -84,6 +95,12 @@ export function reconcileLedger(
     if (prev.status === "dismissed") {
       diff.dismissed.push(f)
       entries.push({ ...prev, lastSeen: now })
+      continue
+    }
+    if (prev.status === "accepted") {
+      // A human accepted this trade-off: keep it recorded and quiet, do not re-nag as "open".
+      diff.accepted.push(f)
+      entries.push({ ...prev, tier: f.tier, claim: f.claim, lastSeen: now })
       continue
     }
     if (prev.status === "done") {
@@ -108,8 +125,45 @@ export function reconcileLedger(
   return { ledger: { version: 1, entries }, diff }
 }
 
-/** Findings the report should surface: everything fresh except dismissed ones. */
+/**
+ * Findings the report should surface: everything fresh except the human-quieted ones —
+ * dismissed (a false positive) and accepted (a known trade-off) both drop out of the default
+ * view. Reconcile still sees the full set, so quieted findings stay tracked and their eventual
+ * fix is still counted as resolved.
+ */
 export function visibleFindings(findings: Finding[], ledger: Ledger): Finding[] {
-  const dismissed = new Set(ledger.entries.filter((e) => e.status === "dismissed").map((e) => e.id))
-  return findings.filter((f) => !dismissed.has(f.id))
+  const quieted = new Set(
+    ledger.entries
+      .filter((e) => e.status === "dismissed" || e.status === "accepted")
+      .map((e) => e.id),
+  )
+  return findings.filter((f) => !quieted.has(f.id))
+}
+
+/**
+ * Apply a human resolution (`dismiss`/`accept`) to one ledger entry. Pure: returns the updated
+ * ledger and the resulting entry, or `entry: null` when the id is not in the ledger (the caller
+ * tells the human to run `etymd audit` first so the finding is on record).
+ */
+export function resolveEntry(
+  ledger: Ledger,
+  id: string,
+  status: HumanResolution,
+  reason: string | undefined,
+  now = new Date().toISOString(),
+): { ledger: Ledger; entry: LedgerEntry | null } {
+  let updated: LedgerEntry | null = null
+  const entries = ledger.entries.map((e) => {
+    if (e.id !== id) return e
+    updated = {
+      ...e,
+      status,
+      // Keep an existing reason if none is supplied (e.g. re-accepting a once-dismissed item).
+      reason: reason ?? e.reason,
+      lastSeen: now,
+    }
+    return updated
+  })
+  if (!updated) return { ledger, entry: null }
+  return { ledger: { version: 1, entries }, entry: updated }
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import { planWorkflow } from "../src/core/generate.js"
+import { isDriftEmpty, summarizeBaselineDrift } from "../src/core/facts.js"
 import type { ProjectFacts } from "../src/core/types.js"
 import { generateAgentsMd, generatePrePushHook, isSafeGateCommand } from "../src/pack/templates.js"
 
@@ -92,5 +93,37 @@ describe("planWorkflow", () => {
   it("plans nothing when both toggles are off", async () => {
     const plan = await planWorkflow("/nonexistent-root", facts(), { agents: false, gates: false })
     expect(plan).toEqual([])
+  })
+})
+
+describe("summarizeBaselineDrift", () => {
+  it("is empty when nothing on the measured axes changed", () => {
+    expect(isDriftEmpty(summarizeBaselineDrift(facts(), facts()))).toBe(true)
+  })
+
+  it("captures command, artifact, and layout changes with direction", () => {
+    const old = facts()
+    const fresh = facts({
+      commands: { raw: { test: "vitest", build: "tsup" }, test: "test", build: "build" },
+      artifacts: [
+        { id: "agents", label: "AGENTS.md", path: "AGENTS.md", kind: "contract", exists: true },
+      ],
+      tree: {
+        dirs: [
+          { name: "src", files: 10 },
+          { name: "docs", files: 3 },
+        ],
+        truncated: false,
+      },
+    })
+    const drift = summarizeBaselineDrift(old, fresh)
+    const byRole = Object.fromEntries(drift.commands.map((c) => [c.role, c]))
+    // lint/typecheck were present in old, gone in fresh; build newly appears.
+    expect(byRole.lint).toEqual({ role: "lint", from: "lint", to: undefined })
+    expect(byRole.build).toEqual({ role: "build", from: undefined, to: "build" })
+    expect(drift.artifactsAdded).toContain("AGENTS.md")
+    expect(drift.dirsAdded).toEqual(["docs"])
+    expect(drift.dirsRemoved).toEqual([])
+    expect(isDriftEmpty(drift)).toBe(false)
   })
 })

@@ -53,6 +53,7 @@ export async function run(opts: AuditOptions): Promise<void> {
             regressed: result.diff.regressed.map((f) => f.id),
             resolved: result.diff.resolved.map((e) => e.id),
             dismissed: result.diff.dismissed.map((f) => f.id),
+            accepted: result.diff.accepted.map((f) => f.id),
           },
         },
         null,

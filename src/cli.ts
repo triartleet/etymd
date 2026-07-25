@@ -72,6 +72,18 @@ program
   )
 
 program
+  .command("approve")
+  .description(
+    "Re-approve the committed baseline after intentional structural changes (non-interactive)",
+  )
+  .action((_opts, cmd) =>
+    action(async () => {
+      const { run } = await import("./commands/approve.js")
+      await run({ cwd: resolveCwd(cmd) })
+    }),
+  )
+
+program
   .command("scan")
   .description("Deterministically reckon the project into a facts index")
   .option("--json", "print the raw facts as JSON")
@@ -113,6 +125,41 @@ program
     action(async () => {
       const { run } = await import("./commands/brief.js")
       await run({ cwd: resolveCwd(cmd), human: opts.human })
+    }),
+  )
+
+program
+  .command("ledger")
+  .description("List every tracked finding grouped by status (open · accepted · dismissed · …)")
+  .option("--json", "print the raw ledger as JSON")
+  .action((opts, cmd) =>
+    action(async () => {
+      const { list } = await import("./commands/ledger.js")
+      await list({ cwd: resolveCwd(cmd), json: opts.json })
+    }),
+  )
+
+program
+  .command("dismiss")
+  .argument("<finding-id>", "the finding id (from `etymd audit`) to dismiss")
+  .description("Dismiss a finding as a false positive / not applicable (hidden from future audits)")
+  .requiredOption("--reason <text>", "why it is dismissed — recorded so the decision survives")
+  .action((id, opts, cmd) =>
+    action(async () => {
+      const { dismiss } = await import("./commands/ledger.js")
+      await dismiss({ cwd: resolveCwd(cmd), id, reason: opts.reason })
+    }),
+  )
+
+program
+  .command("accept")
+  .argument("<finding-id>", "the finding id (from `etymd audit`) to accept")
+  .description("Accept a real finding as a known trade-off (hidden from future audits)")
+  .option("--reason <text>", "optional note on why the trade-off is accepted")
+  .action((id, opts, cmd) =>
+    action(async () => {
+      const { accept } = await import("./commands/ledger.js")
+      await accept({ cwd: resolveCwd(cmd), id, reason: opts.reason })
     }),
   )
 

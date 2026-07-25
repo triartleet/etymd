@@ -6,7 +6,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { applyFiles } from "../src/core/apply.js"
 import { rankFindings, type Finding } from "../src/engine/finding.js"
-import { reconcileLedger, visibleFindings, type Ledger } from "../src/engine/ledger.js"
+import {
+  reconcileLedger,
+  resolveEntry,
+  visibleFindings,
+  type Ledger,
+} from "../src/engine/ledger.js"
 
 function f(id: string, tier: Finding["tier"] = "gap", effort: Finding["effort"] = "M"): Finding {
   return {
@@ -73,6 +78,66 @@ describe("reconcileLedger", () => {
     expect(diff.dismissed.map((x) => x.id)).toEqual(["l/x"])
     expect(ledger.entries.find((e) => e.id === "l/x")?.status).toBe("dismissed")
     expect(ledger.entries.find((e) => e.id === "l/x")?.reason).toBe("accepted trade-off")
+  })
+
+  it("accepted findings are hidden and bucketed, not re-nagged as open", () => {
+    const withAccepted: Ledger = {
+      version: 1,
+      entries: [
+        {
+          id: "l/x",
+          status: "accepted",
+          tier: "gap",
+          claim: "x",
+          firstSeen: "t",
+          lastSeen: "t",
+        },
+      ],
+    }
+    const fresh = [f("l/x"), f("l/y")]
+    expect(visibleFindings(fresh, withAccepted).map((x) => x.id)).toEqual(["l/y"])
+    const { ledger, diff } = reconcileLedger(withAccepted, fresh)
+    expect(diff.accepted.map((x) => x.id)).toEqual(["l/x"])
+    expect(diff.stillOpen.map((x) => x.id)).toEqual([])
+    expect(ledger.entries.find((e) => e.id === "l/x")?.status).toBe("accepted")
+  })
+
+  it("an accepted finding that disappears is counted resolved", () => {
+    const withAccepted: Ledger = {
+      version: 1,
+      entries: [
+        { id: "l/x", status: "accepted", tier: "gap", claim: "x", firstSeen: "t", lastSeen: "t" },
+      ],
+    }
+    const { diff, ledger } = reconcileLedger(withAccepted, [], "2026-02-02")
+    expect(diff.resolved.map((e) => e.id)).toEqual(["l/x"])
+    expect(ledger.entries.find((e) => e.id === "l/x")?.status).toBe("done")
+  })
+})
+
+describe("resolveEntry", () => {
+  const base: Ledger = {
+    version: 1,
+    entries: [
+      { id: "l/x", status: "open", tier: "gap", claim: "x", firstSeen: "t", lastSeen: "t" },
+    ],
+  }
+
+  it("dismiss sets status + reason; accept sets status and keeps a prior reason", () => {
+    const dismissed = resolveEntry(base, "l/x", "dismissed", "false alarm", "2026-03-03")
+    expect(dismissed.entry?.status).toBe("dismissed")
+    expect(dismissed.entry?.reason).toBe("false alarm")
+
+    const accepted = resolveEntry(dismissed.ledger, "l/x", "accepted", undefined, "2026-03-04")
+    expect(accepted.entry?.status).toBe("accepted")
+    // No new reason supplied → the prior one survives rather than being wiped.
+    expect(accepted.entry?.reason).toBe("false alarm")
+  })
+
+  it("returns entry:null for an id that is not in the ledger", () => {
+    const { entry, ledger } = resolveEntry(base, "l/nope", "accepted", undefined)
+    expect(entry).toBeNull()
+    expect(ledger).toBe(base)
   })
 })
 

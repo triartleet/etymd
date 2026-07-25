@@ -1,7 +1,9 @@
 import pc from "picocolors"
 
 import type { Finding, LensReport } from "../engine/finding.js"
+import type { Ledger, LedgerEntry, LedgerStatus } from "../engine/ledger.js"
 import type { LedgerDiff } from "../engine/ledger.js"
+import type { BaselineDrift } from "../core/facts.js"
 import type { ContextBudget, ProjectFacts } from "../core/types.js"
 import { glyph, theme } from "./theme.js"
 
@@ -195,8 +197,64 @@ export function renderLedgerDiff(diff: LedgerDiff): void {
   if (diff.regressed.length) parts.push(theme.bad(`${diff.regressed.length} regressed`))
   if (diff.resolved.length) parts.push(theme.ok(`${diff.resolved.length} resolved`))
   if (diff.dismissed.length) parts.push(theme.dim(`${diff.dismissed.length} dismissed (hidden)`))
+  if (diff.accepted.length) parts.push(theme.dim(`${diff.accepted.length} accepted (hidden)`))
   if (parts.length) {
     print()
     print(`  ${theme.dim("since last audit:")} ${parts.join(theme.dim(" · "))}`)
+  }
+}
+
+const STATUS_ORDER: LedgerStatus[] = ["regressed", "open", "accepted", "dismissed", "done"]
+
+const STATUS_LABEL: Record<LedgerStatus, (s: string) => string> = {
+  regressed: theme.bad,
+  open: theme.warn,
+  accepted: theme.info,
+  dismissed: theme.dim,
+  done: theme.ok,
+}
+
+/** What `etymd approve` is about to bless: the structural change vs the old baseline. */
+export function renderBaselineDrift(drift: BaselineDrift): void {
+  section("Changes since the approved baseline")
+  const line = (glyphStr: string, label: string, detail: string) =>
+    print(`  ${glyphStr} ${theme.dim(label)} ${detail}`)
+  for (const c of drift.commands) {
+    if (c.from && c.to)
+      line(glyph.arrow, `${c.role} command`, `${theme.code(c.from)} → ${theme.code(c.to)}`)
+    else if (c.to) line(theme.ok("+"), `${c.role} command`, theme.code(c.to))
+    else if (c.from)
+      line(theme.bad("−"), `${c.role} command`, `${theme.code(c.from)} ${theme.dim("(gone)")}`)
+  }
+  for (const a of drift.artifactsAdded) line(theme.ok("+"), "artifact", a)
+  for (const a of drift.artifactsRemoved)
+    line(theme.bad("−"), "artifact", `${a} ${theme.dim("(gone)")}`)
+  for (const d of drift.dirsAdded) line(theme.ok("+"), "top-level", theme.info(d + "/"))
+  for (const d of drift.dirsRemoved)
+    line(theme.bad("−"), "top-level", `${theme.info(d + "/")} ${theme.dim("(gone)")}`)
+}
+
+/** The `etymd ledger` list: every tracked finding grouped by status, newest decisions first. */
+export function renderLedger(ledger: Ledger): void {
+  section(`Ledger ${theme.dim(`· ${ledger.entries.length} tracked finding(s)`)}`)
+  if (!ledger.entries.length) {
+    print(`  ${theme.dim("empty — run `etymd audit` to record the current findings")}`)
+    return
+  }
+  const byStatus = new Map<LedgerStatus, LedgerEntry[]>()
+  for (const e of ledger.entries) {
+    const list = byStatus.get(e.status) ?? []
+    list.push(e)
+    byStatus.set(e.status, list)
+  }
+  for (const status of STATUS_ORDER) {
+    const entries = byStatus.get(status)
+    if (!entries?.length) continue
+    print()
+    print(`  ${STATUS_LABEL[status](status)} ${theme.dim(`(${entries.length})`)}`)
+    for (const e of entries) {
+      print(`    ${theme.dim(e.tier)}  ${e.claim}`)
+      print(`         ${theme.dim(e.id)}${e.reason ? theme.dim(` — “${e.reason}”`) : ""}`)
+    }
   }
 }
