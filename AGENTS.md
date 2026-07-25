@@ -50,13 +50,15 @@ over repo-wide scans.
 > changes, and update this section in the same change that moves files.
 
 - `src/cli.ts` — commander wiring; per-command dynamic imports (keep startup thin)
-- `src/commands/` — thin command adapters (audit · init · scan · doctor · context · brief ·
-  gates); no business logic here
+- `src/commands/` — thin command adapters (audit · init · approve · scan · doctor · context ·
+  brief · gates · ledger[dismiss/accept]); no business logic here
 - `src/core/` — the deterministic engine: `scan.ts` (orchestrator) · `detect.ts` (detectors +
-  classifier ladders) · `facts.ts` (cache vs committed baseline, profile) · `context.ts` ·
-  `generate.ts` (onboarding planner) · `apply.ts` (idempotent writes) · `types.ts` · `util.ts`
+  classifier ladders) · `facts.ts` (cache vs committed baseline, profile, baseline-drift summary
+  for `approve`) · `context.ts` · `generate.ts` (onboarding planner) · `apply.ts` (idempotent
+  writes) · `types.ts` · `util.ts`
 - `src/engine/` — the findings engine: `finding.ts` (Finding/Lens/ranking) · `ledger.ts`
-  (committed improvement memory) · `run.ts` (lens registry + audit composition)
+  (committed improvement memory + `resolveEntry` for dismiss/accept) · `run.ts` (lens registry +
+  audit composition)
 - `src/lenses/` — the lenses: `instruction-truth/` (claims extraction + the headline truth lens) ·
   `gate-integrity/` (inventory + lens) · `context-economy.ts`
 - `src/pack/` — the versioned pack: `templates.ts` (minimal scaffold + hooks) · `version.ts`
@@ -75,8 +77,9 @@ over repo-wide scans.
 - `src/engine/finding.ts` `Finding` — the ONE finding schema every lens speaks;
   never introduce a parallel finding shape.
 - `src/lenses/instruction-truth/claims.ts` — claim extraction. Invariant: precision over recall;
-  every skip class (builtins, flagged invocations, globs/URLs/placeholders) is counted and
-  disclosed by the lens, never silently dropped.
+  every skip class (builtins, flagged invocations, globs/URLs/placeholders, unrecognized
+  extensions, gitignored claims, installed-binary commands, uninstalled node_modules) is counted
+  and disclosed by the lens, never silently dropped.
 - `src/core/facts.ts` — cache (`.etymd/cache/`, gitignored) vs baseline
   (`.etymd/baseline.json`, committed). Drift is measured against the baseline, never the cache.
 - `src/core/detect.ts` `ROLE_LADDERS` — command classification. Invariant: specific beats meta

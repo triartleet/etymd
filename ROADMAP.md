@@ -6,17 +6,30 @@ not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.m
 ## Now (prove it in daily use)
 
 - **Daily-driver validation on the corpus.** Run `etymd audit` routinely on the sibling repos
-  (pepshop as the clean control; cra-legacy as the findings-rich case); fix every false positive at the
-  heuristic level (the pepshop 24→0 pass is the model: command-position matching,
-  extensionless-token=prose, workspace-relative resolution).
-- **Ledger management commands.** The ledger supports `dismissed(reason)` / `accepted`, but today
-  that means hand-editing `.etymd/ledger.json`. Add `etymd dismiss <finding-id> --reason "…"` and
-  `etymd accept <finding-id>` (and possibly `etymd ledger` to list statuses).
-- **Baseline refresh verb.** Re-running interactive `init` is the only refresh path. Add
-  `etymd approve` (or `audit --update-baseline`) to re-approve the baseline after intentional
-  structural changes, non-interactively.
-- **`prepare` script** (`"prepare": "npm run build"`) so git-URL installs and fresh checkouts
-  self-build while npm publish is held. Decision pending owner.
+  (pepshop as the clean control; cra-legacy/spa-bff as the findings-rich cases); fix every false positive at
+  the heuristic level. Model passes so far: pepshop 24→0 (command-position matching,
+  extensionless-token=prose, workspace-relative resolution); the `yarn nx` class (nx-monorepo 1→0) —
+  a command that resolves to an installed `node_modules/.bin` binary is true, not a stale script,
+  and is unverifiable (skipped + disclosed) when `node_modules` is absent; and the pepshop-main
+  pass (4→2, 2026-07-25): dotted prose like Better-Auth's `create/update.after` needs a
+  _recognized_ extension to be a file claim, and a missing-but-gitignored claim (`apps/api/.env`)
+  is machine-local — unverifiable, skipped + disclosed. Current corpus baseline: pepshop 2
+  (context-economy, real), cra-legacy 4, spa-bff 5 (3 real stale-path), nx-monorepo 0. **First external gate is
+  live:** pepshop's pre-push hook runs `etymd audit --fail-on risk` via the sibling checkout
+  (pepshop MR 161) — the CI half follows once etymd has a remote.
+
+### Shipped since 003
+
+- **Ledger management commands** — `etymd dismiss <id> --reason "…"` (false positive, reason
+  required), `etymd accept <id>` (known trade-off), `etymd ledger` (list by status). Both dismiss
+  and accept quiet the finding from future audits while keeping it tracked; a later fix still counts
+  as resolved. Engine: `resolveEntry` in `src/engine/ledger.ts`.
+- **`etymd approve`** — non-interactive baseline refresh: shows the structural drift vs the old
+  baseline (commands/artifacts/layout), preserves the approved profile, rewrites `baseline.json`.
+  Requires an existing baseline (points to `init` otherwise). Chose the dedicated verb over an
+  `audit --update-baseline` flag so approval stays an explicit act, not an audit side-effect.
+- **`prepare` script** (`"prepare": "npm run build"`) — git-URL installs and fresh checkouts now
+  self-build while npm publish stays held.
 
 ## Next
 
@@ -54,7 +67,13 @@ not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.m
 
 - **Extensionless file references go unchecked.** `lib/barcode-scan` (no extension, no trailing
   slash) is treated as prose — the rule that killed the `research/trust` / `milestone/mNN`
-  false-positive class. A dir claim needs a trailing `/`; a file claim needs an extension.
+  false-positive class. A dir claim needs a trailing `/`; a file claim needs a _recognized_
+  extension (`KNOWN_EXTENSIONS` in claims.ts — an unknown suffix like `.after` is prose, the
+  rule that killed the Better-Auth hook-notation class). A real file with an exotic extension
+  goes unchecked as the accepted cost.
+- **Gitignored path claims are never accused.** A claimed path that is missing but matched by
+  `.gitignore` (`.env` files, local caches) is machine-local by design — skipped and disclosed,
+  since its absence in one checkout does not make the instruction false anywhere else.
 - **Package-relative paths** resolve only against workspace roots plus their `src/` and
   `scripts/` sub-roots. Deeper prose-relative prefixes (e.g. relative to `apps/x/src/lib/`) are
   not chased.
