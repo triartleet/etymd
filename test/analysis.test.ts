@@ -52,6 +52,21 @@ describe("generateAgentsMd (minimal scaffold)", () => {
     // The scaffold must not claim what the scan cannot know.
     expect(md).not.toContain("PROJECT_CONTEXT.md")
   })
+
+  it("never points at package.json in a docs-only repo that has none", () => {
+    // The wonderbee class: no manifest, no scripts, no frameworks — the scaffold must not
+    // reference a file the scan never saw.
+    const md = generateAgentsMd(
+      facts({
+        packageManager: "unknown",
+        frameworks: [],
+        commands: { raw: {} },
+        tree: { dirs: [], truncated: false },
+      }),
+    )
+    expect(md).not.toContain("package.json")
+    expect(md).toContain("none detected")
+  })
 })
 
 describe("generatePrePushHook", () => {

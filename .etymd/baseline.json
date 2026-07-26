@@ -1,18 +1,18 @@
 {
-  "packVersion": "1",
+  "packVersion": "2",
   "etymdVersion": "0.0.1",
-  "approvedAt": "2026-07-24T16:41:49.139Z",
+  "approvedAt": "2026-07-26T19:52:26.775Z",
   "profile": "solo",
   "facts": {
     "etymdVersion": "0.0.1",
-    "packVersion": "1",
-    "generatedAt": "2026-07-24T16:41:49.135Z",
+    "packVersion": "2",
+    "generatedAt": "2026-07-26T19:52:26.773Z",
     "root": "/Users/redacted/projects/etymd",
     "name": "etymd",
     "git": {
       "isRepo": true,
       "branch": "main",
-      "head": "5a634ad",
+      "head": "38ebe64",
       "hooksPath": ".githooks",
       "husky": false,
       "recentAuthors": 1
@@ -35,6 +35,7 @@
         "test:watch": "vitest",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
+        "prepare": "npm run build",
         "prepublishOnly": "npm run build",
         "changeset": "changeset",
         "version:packages": "changeset version",
@@ -49,7 +50,9 @@
     },
     "ci": {
       "system": "github",
-      "files": [".github/workflows/ci.yml"]
+      "files": [
+        ".github/workflows/ci.yml"
+      ]
     },
     "hooks": {
       "source": "githooks",
@@ -170,7 +173,7 @@
       "dirs": [
         {
           "name": "src",
-          "files": 31
+          "files": 33
         },
         {
           "name": "test",

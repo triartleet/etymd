@@ -173,6 +173,20 @@ describe("detectHooks", () => {
     expect(hooks.prePush).toBe(true)
   })
 
+  it("classifies husky v9's `.husky/_` hooksPath as husky, reading the real hooks", async () => {
+    // The nanoclaw-v2 class: `husky` (v9 prepare) sets core.hooksPath to its shim dir `.husky/_`
+    // while the user's hooks live in `.husky/` — that must never read as a custom setup.
+    await write(".husky/_/pre-commit", '#!/bin/sh\n. "$(dirname "$0")/h"\n')
+    await write(".husky/_/pre-push", '#!/bin/sh\n. "$(dirname "$0")/h"\n')
+    await write(".husky/pre-commit", "pnpm run format:fix\n")
+    const hooks = await detectHooks(dir, ".husky/_", null)
+    expect(hooks.source).toBe("husky")
+    expect(hooks.dir).toBe(".husky")
+    expect(hooks.preCommit).toBe(true)
+    // Only the shim exists for pre-push — no user hook, so it must not count.
+    expect(hooks.prePush).toBe(false)
+  })
+
   it("reports tracked .githooks even when core.hooksPath is unset", async () => {
     await write(".githooks/pre-commit", "#!/bin/sh\nexit 0\n")
     const hooks = await detectHooks(dir, undefined, null)

@@ -295,6 +295,19 @@ export async function detectHooks(
 
   // A custom core.hooksPath wins: git actually runs those hooks, wherever they live.
   if (hooksPath) {
+    // husky v9's `prepare` wires core.hooksPath to `.husky/_` (its shim dir); the user's real
+    // hooks live one level up in `.husky/` — that is husky, not a custom hook setup.
+    if (hooksPath.replace(/\/+$/, "") === ".husky/_") {
+      const base = path.join(root, ".husky")
+      return {
+        source: "husky",
+        dir: ".husky",
+        preCommit: await pathExists(path.join(base, "pre-commit")),
+        prePush: await pathExists(path.join(base, "pre-push")),
+        commitMsg: await pathExists(path.join(base, "commit-msg")),
+        lintStaged,
+      }
+    }
     const base = path.join(root, hooksPath)
     return {
       source: hooksPath === ".githooks" ? "githooks" : "custom",

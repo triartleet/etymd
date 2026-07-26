@@ -64,7 +64,9 @@ function doneDefinition(facts: ProjectFacts): string[] {
 export function generateAgentsMd(facts: ProjectFacts): string {
   const run = runPrefix(facts.packageManager)
   const done = doneDefinition(facts)
-  const frameworks = facts.frameworks.length ? facts.frameworks.join(", ") : "see package.json"
+  // "none detected" stays true with or without a manifest; "see package.json" lied in docs-only
+  // repos where that file does not exist (the wonderbee onboarding, 2026-07-26).
+  const frameworks = facts.frameworks.length ? facts.frameworks.join(", ") : "none detected"
   const workspace =
     facts.workspace.kind === "none" ? "single package" : `${facts.workspace.kind} workspace`
   const topDirs = facts.tree.dirs.slice(0, 14)
