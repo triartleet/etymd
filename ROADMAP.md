@@ -42,6 +42,25 @@ not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.m
 - **Config file** (`.etymd/config.json` or package.json key): context budgets, extra instruction
   globs, path-heuristic ignore rules, per-finding suppressions as an alternative to ledger
   dismissal. Today's budgets (4000 w/file, 8000 w total) are code constants, disclosed in output.
+  **Promoted by the nanoclaw-v2 first audit (2026-07-26, 56 findings):** a fork needs to scope
+  the audit to its own instruction layer (CLAUDE.md, `design/`, own skills) instead of auditing
+  upstream's ~60 skills it will never fix — instruction-glob include/exclude is the fix, not 51
+  ledger dismissals.
+- **Prospective-path skip class** (from the same nanoclaw run): a path claim in a skill whose
+  surrounding text instructs _creating_ it (migration quarantine dirs, generated files) or that
+  is an obvious placeholder (`my-custom-skill`) is not a stale claim — skip + disclose, per
+  precision-over-recall. The second new-class harvest after Better-Auth notation.
+- **Corpus follow-ups, next sessions:**
+  - **nanoclaw-v2** — after the two fixes above, re-audit: expect the 51 stale-paths to collapse
+    to the genuinely stale upstream drift (`agent-runner/src`, `src/native-credential-proxy.ts`);
+    the 1 risk (dead `uninstall` script claim) and the 3 CI-only-gate gaps are the fork owner's
+    calls (hooks divergence from upstream is deliberate).
+  - **wonderbee** — the contract deliberately says "do not start building"; as design sessions
+    produce the design record and the stack lands, the AGENTS.md fills in and `etymd audit`
+    tracks each claim as it becomes checkable. First re-approve will restamp pack v1 → v2.
+  - **cc-gg-bridgy** — first push exercises the new pre-push gate live; when the repo gets CI,
+    gate it on `etymd audit --fail-on risk` (the second external gate after pepshop). Also
+    restamps to pack v2 on next approve.
 - **Baseline-aware CI recipe hardening**: document the two-job pattern (audit `--fail-on risk` on
   MRs; scheduled full audit that comments the ledger diff).
 - **Context-economy deepening**: measure the delta an extraction actually buys (before/after
