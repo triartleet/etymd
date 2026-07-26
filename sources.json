@@ -28,6 +28,27 @@
       "role": "reference",
       "shape": "CRA + Apollo + husky/lint-staged",
       "note": "CRA/husky command-set + hook-setup coverage"
+    },
+    {
+      "name": "cc-gg-bridgy",
+      "path": "../cc-gg-bridgy",
+      "role": "reference",
+      "shape": "single-repo VS Code extension / esbuild + pnpm",
+      "note": "smallest surface; first etymd-scaffolded contract in daily use (init dogfood 2026-07-26)"
+    },
+    {
+      "name": "wonderbee",
+      "path": "../wonderbee",
+      "role": "reference",
+      "shape": "docs-only, no package manifest",
+      "note": "pre-design repo; covers the no-manifest scaffold class (the see-package.json fix)"
+    },
+    {
+      "name": "nanoclaw-v2",
+      "path": "../nanoclaw-v2",
+      "role": "reference",
+      "shape": "pnpm + Bun fork of an active upstream OSS assistant",
+      "note": "large claim-rich surface: 29KB CLAUDE.md, symlinked+gitignored AGENTS.md, husky; onboarding pending"
     }
   ]
 }

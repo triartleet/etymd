@@ -20,6 +20,12 @@ not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.m
 
 ### Shipped since 003
 
+- **Corpus grown to 7** (2026-07-26): cc-gg-bridgy (first etymd-scaffolded contract in daily
+  use), wonderbee (docs-only, no manifest), nanoclaw-v2 (large fork, 29KB CLAUDE.md, symlinked
+  AGENTS.md — onboarding pending). First `init` dogfood immediately caught two classes, both
+  fixed at the source: the scaffold's frameworks fallback claimed `see package.json` in repos
+  that have none (pack v2), and husky v9's `.husky/_` hooksPath misread as a custom hook setup.
+
 - **Ledger management commands** — `etymd dismiss <id> --reason "…"` (false positive, reason
   required), `etymd accept <id>` (known trade-off), `etymd ledger` (list by status). Both dismiss
   and accept quiet the finding from future audits while keeping it tracked; a later fix still counts

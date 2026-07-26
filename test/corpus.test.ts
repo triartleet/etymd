@@ -77,3 +77,72 @@ describe.skipIf(!hasRepo("cra-legacy"))("corpus: cra-legacy (the un-converted re
     expect(inv.thresholds.coverageThresholdLocal).toBe(false)
   })
 })
+
+describe.skipIf(!hasRepo("cc-gg-bridgy"))(
+  "corpus: cc-gg-bridgy (etymd-scaffolded extension)",
+  () => {
+    it("scans the onboarded state: pnpm, tracked githooks, contract present", async () => {
+      const facts = await scanProject(repo("cc-gg-bridgy"))
+      expect(facts.packageManager).toBe("pnpm")
+      expect(facts.hooks.source).toBe("githooks")
+      expect(facts.commands.typecheck).toBe("typecheck")
+      expect(facts.artifacts.find((a) => a.id === "agents")?.exists).toBe(true)
+    })
+
+    it("truth lens holds on the contract etymd itself scaffolded", async () => {
+      const root = repo("cc-gg-bridgy")
+      const facts = await scanProject(root)
+      const report = await instructionTruthLens.run({
+        root,
+        facts,
+        profile: "solo",
+        baseline: null,
+      })
+      expect(report.status).toBe("ran")
+      for (const f of report.findings) expect(f.evidence.length).toBeGreaterThan(0)
+    })
+  },
+)
+
+describe.skipIf(!hasRepo("wonderbee"))("corpus: wonderbee (docs-only, no manifest)", () => {
+  it("scans a repo with no package.json without inventing facts", async () => {
+    const facts = await scanProject(repo("wonderbee"))
+    expect(facts.packageManager).toBe("unknown")
+    expect(facts.workspace.kind).toBe("none")
+    expect(facts.commands.test).toBeUndefined()
+    expect(facts.artifacts.find((a) => a.id === "agents")?.exists).toBe(true)
+  })
+
+  it("truth lens runs over a code-free contract", async () => {
+    const root = repo("wonderbee")
+    const facts = await scanProject(root)
+    const report = await instructionTruthLens.run({ root, facts, profile: "solo", baseline: null })
+    expect(report.status).toBe("ran")
+    for (const f of report.findings) expect(f.evidence.length).toBeGreaterThan(0)
+  })
+})
+
+describe.skipIf(!hasRepo("nanoclaw-v2"))(
+  "corpus: nanoclaw-v2 (large fork, symlinked contract)",
+  () => {
+    it("scans the fork: pnpm, husky hooks, AGENTS.md symlink counts as a contract", async () => {
+      const facts = await scanProject(repo("nanoclaw-v2"))
+      expect(facts.packageManager).toBe("pnpm")
+      expect(facts.hooks.source).toBe("husky")
+      expect(facts.artifacts.find((a) => a.id === "agents")?.exists).toBe(true)
+    })
+
+    it("truth lens survives the 29KB claim-rich CLAUDE.md read-only", async () => {
+      const root = repo("nanoclaw-v2")
+      const facts = await scanProject(root)
+      const report = await instructionTruthLens.run({
+        root,
+        facts,
+        profile: "solo",
+        baseline: null,
+      })
+      expect(report.status).toBe("ran")
+      for (const f of report.findings) expect(f.evidence.length).toBeGreaterThan(0)
+    })
+  },
+)
