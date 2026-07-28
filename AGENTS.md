@@ -122,6 +122,8 @@ A change is done when these are green:
 - `npm run format:check`
 - `npm run typecheck`
 - `npm test`
+- the self-audit — the built CLI run against this repo with `audit --fail-on risk`, which the
+  pre-push hook and CI both enforce. etymd guards its own instructions with etymd.
 
 ## Commands
 

@@ -6,3 +6,11 @@ echo "› npm run typecheck"
 npm run typecheck || exit 1
 echo "› npm test"
 npm test || exit 1
+# The truth gate, on itself — same command the README tells users to put in CI. Uses the built
+# CLI; skips with a note when dist/ is absent rather than blocking a push on a missing build.
+if [ -f dist/cli.js ]; then
+  echo "› etymd audit --fail-on risk"
+  node dist/cli.js audit --no-ledger --fail-on risk || exit 1
+else
+  echo "› etymd audit skipped (no dist/ — run npm run build)"
+fi

@@ -20,3 +20,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # etymd guards its own instructions with etymd. The README tells users to gate CI on this
+      # exact command; a truth guard that does not run on itself is the thing it exists to catch.
+      - name: etymd audit (self)
+        run: node dist/cli.js audit --no-ledger --fail-on risk

@@ -17,6 +17,14 @@
   ],
   "license": "MIT",
   "author": "Alkis Yuv",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/triartleet/etymd.git"
+  },
+  "homepage": "https://github.com/triartleet/etymd#readme",
+  "bugs": {
+    "url": "https://github.com/triartleet/etymd/issues"
+  },
   "type": "module",
   "bin": {
     "etymd": "./dist/cli.js"
