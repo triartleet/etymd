@@ -9,6 +9,7 @@ import { measureContext } from "../src/core/context.js"
 import { expandFileGlobs } from "../src/core/detect.js"
 import { scanProject } from "../src/core/scan.js"
 import { matchesGlob } from "../src/core/util.js"
+import { reconcileLedger } from "../src/engine/ledger.js"
 import { contextEconomyLens } from "../src/lenses/context-economy.js"
 import { instructionTruthLens } from "../src/lenses/instruction-truth/lens.js"
 import type { LensContext } from "../src/engine/finding.js"
@@ -185,6 +186,66 @@ describe("instruction scoping (the fork case)", () => {
     expect(report.disclosures.some((d) => d.includes("not valid JSON"))).toBe(true)
     // Broken config must not silently narrow the audit — everything is still checked.
     expect(report.findings).toHaveLength(2)
+  })
+})
+
+describe("scoping must not rewrite unfixed findings as successes", () => {
+  it("holds a tracked finding whose file was excluded, instead of resolving it", () => {
+    const ledger = {
+      version: 1 as const,
+      entries: [
+        {
+          id: "instruction-truth/stale-path:.claude/skills/up-a/SKILL.md:upstream/gone.ts",
+          status: "open" as const,
+          tier: "gap" as const,
+          claim: "…",
+          firstSeen: "2026-01-01T00:00:00.000Z",
+          lastSeen: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "instruction-truth/stale-path:CLAUDE.md:really/fixed.ts",
+          status: "open" as const,
+          tier: "gap" as const,
+          claim: "…",
+          firstSeen: "2026-01-01T00:00:00.000Z",
+          lastSeen: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    }
+
+    const { ledger: next, diff } = reconcileLedger(ledger, [], "2026-07-28T00:00:00.000Z", [
+      ".claude/skills/up-a/SKILL.md",
+    ])
+
+    // Excluded: absent because nobody looked — held open, and lastSeen untouched so the record
+    // still says when it was last actually examined.
+    const held = next.entries.find((e) => e.id.includes("up-a"))
+    expect(held?.status).toBe("open")
+    expect(held?.lastSeen).toBe("2026-01-01T00:00:00.000Z")
+    expect(diff.outOfScope.map((e) => e.id)).toEqual([
+      "instruction-truth/stale-path:.claude/skills/up-a/SKILL.md:upstream/gone.ts",
+    ])
+
+    // In scope and gone: genuinely fixed.
+    const fixed = next.entries.find((e) => e.id.includes("CLAUDE.md"))
+    expect(fixed?.status).toBe("done")
+    expect(diff.resolved.map((e) => e.id)).toEqual([
+      "instruction-truth/stale-path:CLAUDE.md:really/fixed.ts",
+    ])
+  })
+
+  it("reports the excluded files so the engine can hold their entries", async () => {
+    await write("package.json", JSON.stringify({ name: "scoped", scripts: {} }))
+    await write("pnpm-lock.yaml", "")
+    await write("node_modules/.bin/.keep", "")
+    await write("CLAUDE.md", "# CLAUDE.md\n\nOwn layer.\n")
+    await write(".claude/skills/up/SKILL.md", "See `upstream/gone.ts`.\n")
+    await write(
+      ".etymd/config.json",
+      JSON.stringify({ instructions: { exclude: [".claude/skills/**"] } }),
+    )
+    const report = await instructionTruthLens.run(await ctx())
+    expect(report.outOfScope).toEqual([".claude/skills/up/SKILL.md"])
   })
 })
 

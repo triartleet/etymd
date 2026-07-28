@@ -16,6 +16,10 @@ rationale are recorded in `docs/design/003-truth-guard-pivot.md`.)
   - **context-economy**: the always-loaded footprint in words/tokens; extraction candidates.
   - Ranked findings (risk → gap → polish) with evidence · a **committed ledger** (resolved /
     regressed / dismissed-never-resurfaces) · lens-coverage reporting · `--fail-on <tier>` for CI.
+- **Excluding a file never resolves its tracked findings.** A finding missing from a scoped run is
+  absent because nobody looked, not because it was fixed. The ledger holds those entries open
+  (`lastSeen` untouched) and the diff reports them as held rather than folding them into
+  "N resolved".
 - **`init` baselines the repo it leaves behind.** It used to approve the scan taken *before* its
   own scaffold, so the first baseline recorded AGENTS.md and the hooks as absent — and deleting
   them later never registered as drift, which is the baseline's whole job. It now re-scans after

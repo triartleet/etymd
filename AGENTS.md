@@ -86,7 +86,10 @@ over repo-wide scans.
   (`.etymd/baseline.json`, committed). Drift is measured against the baseline, never the cache.
 - `src/core/config.ts` — the optional committed config file under `.etymd/` (audit scope +
   context budgets; etymd itself needs neither, so the file is absent here). Invariant: scoping
-  must never buy silence. Every file dropped by
+  must never buy silence — that holds in the LEDGER too. A tracked finding whose file the run
+  excluded is absent because nobody looked, not because it was fixed: `reconcileLedger` holds it
+  open (`outOfScope`), never `done`. Silently resolving it would let scoping rewrite unfixed
+  problems as successes. Every file dropped by
   `instructions.exclude` is counted and NAMED in the lens disclosures, and malformed config is
   disclosed instead of silently falling back — a narrowed audit that looked clean would be the
   exact dishonesty this tool exists to catch. Reading config is the engine's job (`run.ts` loads

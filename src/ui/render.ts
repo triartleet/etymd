@@ -198,6 +198,9 @@ export function renderLedgerDiff(diff: LedgerDiff): void {
   if (diff.resolved.length) parts.push(theme.ok(`${diff.resolved.length} resolved`))
   if (diff.dismissed.length) parts.push(theme.dim(`${diff.dismissed.length} dismissed (hidden)`))
   if (diff.accepted.length) parts.push(theme.dim(`${diff.accepted.length} accepted (hidden)`))
+  // Never let "N resolved" absorb findings nobody looked at — say plainly that they are held.
+  if (diff.outOfScope.length)
+    parts.push(theme.dim(`${diff.outOfScope.length} held (excluded from this audit, not fixed)`))
   if (parts.length) {
     print()
     print(`  ${theme.dim("since last audit:")} ${parts.join(theme.dim(" · "))}`)

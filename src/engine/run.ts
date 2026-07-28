@@ -91,7 +91,9 @@ export async function runAudit(root: string, opts: AuditOptions = {}): Promise<A
 
   const all = reports.flatMap((r) => r.findings)
   const previous = await readLedger(root)
-  const { ledger, diff } = reconcileLedger(previous, all)
+  // Files no lens looked at this run must not have their tracked findings closed as fixed.
+  const outOfScope = reports.flatMap((r) => r.outOfScope ?? [])
+  const { ledger, diff } = reconcileLedger(previous, all, undefined, outOfScope)
   // A partial run (kind/lens filter) must not mark unexamined findings resolved — only persist
   // the reconciliation when every lens ran.
   const fullRun = selected.length === LENSES.length

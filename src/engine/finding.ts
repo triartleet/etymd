@@ -37,6 +37,11 @@ export interface LensReport {
   /** Partial-visibility disclosures (e.g. "3 CI jobs inherited from an unseen template"). */
   disclosures: string[]
   findings: Finding[]
+  /**
+   * Files this run deliberately did not examine (config exclusions). Their absence from
+   * `findings` means "unexamined", never "fixed" — the ledger must not resolve them.
+   */
+  outOfScope?: string[]
 }
 
 export interface LensContext {

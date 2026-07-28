@@ -350,6 +350,7 @@ export const instructionTruthLens: Lens = {
       status: "ran",
       disclosures,
       findings,
+      outOfScope: excluded,
     }
   },
 }

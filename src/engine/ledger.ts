@@ -33,6 +33,8 @@ export interface LedgerDiff {
   resolved: LedgerEntry[]
   dismissed: Finding[]
   accepted: Finding[]
+  /** Tracked findings in files this run excluded — held open, never counted as resolved. */
+  outOfScope: LedgerEntry[]
 }
 
 /** Human-set resolutions, applied by `etymd dismiss` / `etymd accept`. */
@@ -52,15 +54,26 @@ export async function writeLedger(root: string, ledger: Ledger): Promise<void> {
   await fs.writeFile(target, JSON.stringify(ledger, null, 2) + "\n", "utf8")
 }
 
+/** A finding id names the file it came from: `<lens>/<class>:<file>[:<detail>]`. */
+function belongsToAny(id: string, paths: string[]): boolean {
+  return paths.some((p) => id.includes(`:${p}`))
+}
+
 /**
  * Reconcile fresh findings against the ledger. Pure: returns the updated ledger + the diff;
  * the caller decides whether to persist. A finding absent from a run is marked `done`
  * (resolved); a `done` entry that reappears becomes `regressed`; `dismissed` stays dismissed.
+ *
+ * `outOfScope` names files the run deliberately did not look at (config exclusions). Their
+ * tracked findings are NOT absent because they were fixed — they are absent because nobody
+ * looked. Recording them as resolved would let scoping rewrite unfixed problems as successes,
+ * which is the same silence the exclusion disclosures exist to prevent. They are held untouched.
  */
 export function reconcileLedger(
   ledger: Ledger,
   findings: Finding[],
   now = new Date().toISOString(),
+  outOfScope: string[] = [],
 ): {
   ledger: Ledger
   diff: LedgerDiff
@@ -74,6 +87,7 @@ export function reconcileLedger(
     resolved: [],
     dismissed: [],
     accepted: [],
+    outOfScope: [],
   }
   const entries: LedgerEntry[] = []
 
@@ -114,6 +128,13 @@ export function reconcileLedger(
 
   for (const prev of ledger.entries) {
     if (seen.has(prev.id)) continue
+    if (outOfScope.length && belongsToAny(prev.id, outOfScope)) {
+      // Unexamined, not fixed: hold the entry exactly as it was (lastSeen untouched, so the
+      // record still says when it was last actually looked at).
+      diff.outOfScope.push(prev)
+      entries.push(prev)
+      continue
+    }
     if (prev.status === "open" || prev.status === "accepted" || prev.status === "regressed") {
       diff.resolved.push(prev)
       entries.push({ ...prev, status: "done", lastSeen: now })
