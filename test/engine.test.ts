@@ -12,6 +12,8 @@ import {
   type Baseline,
 } from "../src/core/facts.js"
 import { scanProject } from "../src/core/scan.js"
+import { git } from "../src/core/util.js"
+import { run as runInit } from "../src/commands/init.js"
 import { rankFindings, type Finding } from "../src/engine/finding.js"
 import { instructionTruthLens } from "../src/lenses/instruction-truth/lens.js"
 import {
@@ -181,6 +183,33 @@ describe("applyFiles", () => {
     const again = await applyFiles(dir, files, new Set(["KEEP.md"]))
     expect(again.written).toContain("KEEP.md")
     expect(await fs.readFile(path.join(dir, "KEEP.md"), "utf8")).toBe("generated\n")
+  })
+})
+
+describe("init approves the repo it leaves behind, not the one it found", () => {
+  let dir: string
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "etymd-init-"))
+    await fs.writeFile(
+      path.join(dir, "package.json"),
+      JSON.stringify({ name: "onboarded", scripts: { test: "vitest run" } }),
+      "utf8",
+    )
+    await git(dir, ["init"])
+  })
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true })
+  })
+
+  it("baselines the scaffold it just wrote, so a later deletion still reads as drift", async () => {
+    await runInit({ cwd: dir, yes: true })
+
+    const baseline = await readBaseline(dir)
+    const contract = baseline?.facts.artifacts.find((a) => a.id === "agents")
+    // Baselining the pre-scaffold scan would record AGENTS.md as absent — and its later removal
+    // would then be invisible to the drift check, which is the baseline's whole job.
+    expect(contract?.exists).toBe(true)
+    expect(await fs.readFile(path.join(dir, "AGENTS.md"), "utf8")).toContain("AGENTS.md")
   })
 })
 

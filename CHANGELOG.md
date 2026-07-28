@@ -16,6 +16,10 @@ rationale are recorded in `docs/design/003-truth-guard-pivot.md`.)
   - **context-economy**: the always-loaded footprint in words/tokens; extraction candidates.
   - Ranked findings (risk → gap → polish) with evidence · a **committed ledger** (resolved /
     regressed / dismissed-never-resurfaces) · lens-coverage reporting · `--fail-on <tier>` for CI.
+- **`init` baselines the repo it leaves behind.** It used to approve the scan taken *before* its
+  own scaffold, so the first baseline recorded AGENTS.md and the hooks as absent — and deleting
+  them later never registered as drift, which is the baseline's whole job. It now re-scans after
+  writing.
 - **The committed baseline carries no machine path.** `baseline.json` used to record the scan's
   absolute root — the approver's username and directory layout — in the one file etymd tells people
   to commit and therefore publish. The root is now elided on write (`"."`; it is redundant inside
