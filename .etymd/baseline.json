@@ -1,21 +1,21 @@
 {
   "packVersion": "2",
   "etymdVersion": "0.0.1",
-  "approvedAt": "2026-07-26T19:52:26.775Z",
+  "approvedAt": "2026-07-28T05:19:58.837Z",
   "profile": "solo",
   "facts": {
     "etymdVersion": "0.0.1",
     "packVersion": "2",
-    "generatedAt": "2026-07-26T19:52:26.773Z",
-    "root": "/Users/redacted/projects/etymd",
+    "generatedAt": "2026-07-28T05:19:58.834Z",
+    "root": ".",
     "name": "etymd",
     "git": {
       "isRepo": true,
       "branch": "main",
-      "head": "38ebe64",
+      "head": "064efbd",
       "hooksPath": ".githooks",
       "husky": false,
-      "recentAuthors": 1
+      "recentAuthors": 2
     },
     "packageManager": "npm",
     "node": ">=18.17",
@@ -33,8 +33,9 @@
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
         "test:watch": "vitest",
-        "format": "prettier --write .",
-        "format:check": "prettier --check .",
+        "format": "prettier --write . && npm run guard:md",
+        "format:check": "prettier --check . && npm run guard:md",
+        "guard:md": "! grep -rnF --include=*.md --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git '\\*\\*' .",
         "prepare": "npm run build",
         "prepublishOnly": "npm run build",
         "changeset": "changeset",
@@ -173,11 +174,11 @@
       "dirs": [
         {
           "name": "src",
-          "files": 33
+          "files": 34
         },
         {
           "name": "test",
-          "files": 6
+          "files": 7
         },
         {
           "name": "docs",
