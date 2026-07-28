@@ -201,3 +201,39 @@ jobs:
     expect(inv.ci.jobs.find((j) => j.job === "advisory")?.advisory).toBe(true)
   })
 })
+
+describe("hook wiring is a developer-machine fact, not a CI one", () => {
+  // A CI checkout never has git config, so core.hooksPath is ALWAYS unset there. Accusing it
+  // would fail the very `etymd audit --fail-on risk` gate the README tells users to add — in
+  // every repo with tracked hooks. Caught by etymd's own first CI run.
+  const inv = {
+    local: { source: "githooks", wired: false, preCommit: [], prePush: [], commitMsg: [] },
+    ci: { system: "none", jobs: [], inheritedIncludes: [], parseErrors: [] },
+    thresholds: {},
+  } as unknown as Parameters<typeof deriveGateFindings>[0]
+
+  const withCi = <T>(value: string | undefined, fn: () => T): T => {
+    const before = process.env.CI
+    if (value === undefined) delete process.env.CI
+    else process.env.CI = value
+    try {
+      return fn()
+    } finally {
+      if (before === undefined) delete process.env.CI
+      else process.env.CI = before
+    }
+  }
+
+  it("flags unwired hooks on a developer machine", () => {
+    const disclosures: string[] = []
+    const ids = withCi(undefined, () => deriveGateFindings(inv, disclosures)).map((f) => f.id)
+    expect(ids).toContain("gate-integrity/hooks-not-wired")
+  })
+
+  it("skips and discloses instead of flagging when running in CI", () => {
+    const disclosures: string[] = []
+    const ids = withCi("true", () => deriveGateFindings(inv, disclosures)).map((f) => f.id)
+    expect(ids).not.toContain("gate-integrity/hooks-not-wired")
+    expect(disclosures.some((d) => d.includes("Running in CI"))).toBe(true)
+  })
+})

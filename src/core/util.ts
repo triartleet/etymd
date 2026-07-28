@@ -65,6 +65,25 @@ export function relativizePath(root: string, p: string): string {
   return r === "" ? "." : r
 }
 
+/**
+ * True inside a CI runner. Some facts are properties of a DEVELOPER's machine (git hook wiring,
+ * local tool installs) and are absent from an ephemeral checkout by design — judging them from CI
+ * would fail the very gate this tool tells people to add. `CI` is set by every mainstream runner;
+ * the named vars are belt-and-braces.
+ */
+export function isCiEnvironment(): boolean {
+  const env = process.env
+  return Boolean(
+    env.CI ||
+      env.GITHUB_ACTIONS ||
+      env.GITLAB_CI ||
+      env.BUILDKITE ||
+      env.CIRCLECI ||
+      env.JENKINS_URL ||
+      env.TF_BUILD,
+  )
+}
+
 /** Repo-relative POSIX form: `\` → `/`, no leading `./`, no trailing `/`. */
 export function normalizeRelPath(p: string): string {
   return p.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, "")

@@ -1,4 +1,5 @@
 import type { Finding, Lens, LensReport } from "../../engine/finding.js"
+import { isCiEnvironment } from "../../core/util.js"
 import { buildGateInventory, type GateInventory, type GateTool } from "./inventory.js"
 
 const LENS_ID = "gate-integrity"
@@ -26,7 +27,7 @@ function finding(partial: Omit<Finding, "lens">): Finding {
   return { lens: LENS_ID, ...partial }
 }
 
-export function deriveGateFindings(inv: GateInventory): Finding[] {
+export function deriveGateFindings(inv: GateInventory, disclosures: string[] = []): Finding[] {
   const findings: Finding[] = []
   const localTools = new Set<GateTool>([
     ...inv.local.preCommit,
@@ -37,20 +38,29 @@ export function deriveGateFindings(inv: GateInventory): Finding[] {
   const enforcedCiTools = new Set<GateTool>(enforcedCiJobs.flatMap((j) => j.tools))
   const anyCiTools = new Set<GateTool>(inv.ci.jobs.flatMap((j) => j.tools))
 
-  // Hooks that exist but never run are the most silent failure a gate can have.
+  // Hooks that exist but never run are the most silent failure a gate can have — but only on a
+  // machine where hooks were ever meant to run. A CI checkout has no git config by design, so
+  // `core.hooksPath` is ALWAYS unset there: accusing it would fail the very CI gate this tool
+  // tells people to add, in every repo with tracked hooks. Unverifiable here — skip and disclose.
   if (inv.local.source === "githooks" && !inv.local.wired) {
-    findings.push(
-      finding({
-        id: `${LENS_ID}/hooks-not-wired`,
-        tier: "risk",
-        claim: "Tracked .githooks/ exist but git core.hooksPath is unset — the hooks never run",
-        evidence: [".githooks/"],
-        why: "Every check in those hooks is silently skipped on this clone.",
-        action: "Run `git config core.hooksPath .githooks` (etymd gates does this).",
-        effort: "S",
-        confidence: "high",
-      }),
-    )
+    if (isCiEnvironment()) {
+      disclosures.push(
+        "Running in CI: git hook wiring (core.hooksPath) is a developer-machine fact and cannot be judged from an ephemeral checkout — not flagged here. Run `etymd audit` locally to check it.",
+      )
+    } else {
+      findings.push(
+        finding({
+          id: `${LENS_ID}/hooks-not-wired`,
+          tier: "risk",
+          claim: "Tracked .githooks/ exist but git core.hooksPath is unset — the hooks never run",
+          evidence: [".githooks/"],
+          why: "Every check in those hooks is silently skipped on this clone.",
+          action: "Run `git config core.hooksPath .githooks` (etymd gates does this).",
+          effort: "S",
+          confidence: "high",
+        }),
+      )
+    }
   }
 
   // Shift-left gaps: CI enforces a correctness tool no local hook runs — failures surface only
@@ -187,6 +197,9 @@ export const gateIntegrityLens: Lens = {
     if (inv.ci.system === "none")
       disclosures.push("No CI configuration found — CI↔local comparisons skipped.")
 
+    // Derive before returning: it may add disclosures of its own (e.g. the CI hook-wiring skip).
+    const findings = deriveGateFindings(inv, disclosures)
+
     return {
       lens: LENS_ID,
       version: "1",
@@ -194,7 +207,7 @@ export const gateIntegrityLens: Lens = {
       kind: "improvement",
       status: "ran",
       disclosures,
-      findings: deriveGateFindings(inv),
+      findings,
     }
   },
 }

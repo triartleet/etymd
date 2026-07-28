@@ -116,6 +116,11 @@ not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.m
 - **Naming stand-ins are not claims.** A segment prefixed `my-`/`your-`, or named `placeholder`/
   `foo`/`bar`/`baz`/`qux`, is a shape description. A real directory actually called `my-thing`
   therefore goes unchecked.
+- **Developer-machine facts are not judged from CI.** Git hook wiring (`core.hooksPath`) is absent
+  from an ephemeral CI checkout by design, so in CI it is skipped and disclosed rather than flagged.
+  Without this, the `audit --fail-on risk` gate this tool recommends would fail forever in every
+  repo with tracked hooks — caught by etymd's own first CI run. The cost: a genuinely unwired hook
+  set is only reported locally.
 - **Gitignored path claims are never accused.** A claimed path that is missing but matched by
   `.gitignore` (`.env` files, local caches) is machine-local by design — skipped and disclosed,
   since its absence in one checkout does not make the instruction false anywhere else.
