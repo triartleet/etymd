@@ -96,6 +96,9 @@ is the dominant cost of the loop; a lean contract is a correctness feature.
 | `.etymd/config.json`   | **committed** | optional: audit scope + context budgets          |
 | `.etymd/cache/`        | gitignored    | transient scan cache                             |
 
+The committed files are written to be publishable: the baseline records `"."` as its scan root, never
+your absolute machine path. Only the gitignored cache keeps the real one.
+
 ### `.etymd/config.json` (optional)
 
 Every key is optional; omit the file entirely and the defaults below apply.

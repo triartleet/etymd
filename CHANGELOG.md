@@ -16,6 +16,11 @@ rationale are recorded in `docs/design/003-truth-guard-pivot.md`.)
   - **context-economy**: the always-loaded footprint in words/tokens; extraction candidates.
   - Ranked findings (risk → gap → polish) with evidence · a **committed ledger** (resolved /
     regressed / dismissed-never-resurfaces) · lens-coverage reporting · `--fail-on <tier>` for CI.
+- **The committed baseline carries no machine path.** `baseline.json` used to record the scan's
+  absolute root — the approver's username and directory layout — in the one file etymd tells people
+  to commit and therefore publish. The root is now elided on write (`"."`; it is redundant inside
+  the repo it describes). A baseline written by an older etymd is detected and disclosed with the
+  fix: `etymd approve`.
 - **`.etymd/config.json`** (optional, committed) — `instructions.include` / `instructions.exclude`
   globs scope which instruction files are audited (a fork keeps its own layer honest without
   auditing inherited upstream skills), and `context.perFileWords` / `context.totalWords` make the

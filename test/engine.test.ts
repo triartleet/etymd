@@ -5,7 +5,15 @@ import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { applyFiles } from "../src/core/apply.js"
+import {
+  baselineCarriesMachinePath,
+  readBaseline,
+  writeBaseline,
+  type Baseline,
+} from "../src/core/facts.js"
+import { scanProject } from "../src/core/scan.js"
 import { rankFindings, type Finding } from "../src/engine/finding.js"
+import { instructionTruthLens } from "../src/lenses/instruction-truth/lens.js"
 import {
   reconcileLedger,
   resolveEntry,
@@ -173,5 +181,64 @@ describe("applyFiles", () => {
     const again = await applyFiles(dir, files, new Set(["KEEP.md"]))
     expect(again.written).toContain("KEEP.md")
     expect(await fs.readFile(path.join(dir, "KEEP.md"), "utf8")).toBe("generated\n")
+  })
+})
+
+describe("the committed baseline carries no machine path", () => {
+  let dir: string
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "etymd-baseline-"))
+    await fs.writeFile(path.join(dir, "package.json"), JSON.stringify({ name: "pub" }), "utf8")
+  })
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true })
+  })
+
+  async function freshBaseline(): Promise<Baseline> {
+    const facts = await scanProject(dir)
+    // The scan legitimately holds the absolute root; it is the WRITE that must elide it.
+    expect(path.isAbsolute(facts.root)).toBe(true)
+    return {
+      packVersion: "2",
+      etymdVersion: "0.0.1",
+      approvedAt: new Date().toISOString(),
+      profile: "solo",
+      facts,
+    }
+  }
+
+  it("elides the absolute scan root on write", async () => {
+    await writeBaseline(dir, await freshBaseline())
+    const written = await readBaseline(dir)
+    // A committed file must never publish the approver's username or directory layout.
+    expect(written?.facts.root).toBe(".")
+    expect(JSON.stringify(written)).not.toContain(os.tmpdir())
+    expect(baselineCarriesMachinePath(written as Baseline)).toBe(false)
+  })
+
+  it("tells the holder of an older baseline that their committed file leaks a path", async () => {
+    const stale = await freshBaseline()
+    await fs.mkdir(path.join(dir, ".etymd"), { recursive: true })
+    // Written the way pre-fix etymd wrote it: root left absolute.
+    await fs.writeFile(
+      path.join(dir, ".etymd", "baseline.json"),
+      JSON.stringify(stale, null, 2),
+      "utf8",
+    )
+    const baseline = await readBaseline(dir)
+    expect(baselineCarriesMachinePath(baseline as Baseline)).toBe(true)
+
+    const facts = await scanProject(dir)
+    const report = await instructionTruthLens.run({ root: dir, facts, profile: "solo", baseline })
+    expect(report.disclosures.some((d) => d.includes("absolute machine path"))).toBe(true)
+    expect(report.disclosures.some((d) => d.includes("etymd approve"))).toBe(true)
+  })
+
+  it("says nothing when the baseline is already clean", async () => {
+    await writeBaseline(dir, await freshBaseline())
+    const baseline = await readBaseline(dir)
+    const facts = await scanProject(dir)
+    const report = await instructionTruthLens.run({ root: dir, facts, profile: "solo", baseline })
+    expect(report.disclosures.some((d) => d.includes("absolute machine path"))).toBe(false)
   })
 })

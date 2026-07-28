@@ -3,6 +3,7 @@ import path from "node:path"
 import { PACK_VERSION } from "../../pack/version.js"
 import type { Finding, Lens, LensContext, LensReport } from "../../engine/finding.js"
 import { CONFIG_FILE, DEFAULT_CONFIG } from "../../core/config.js"
+import { BASELINE_FILE, baselineCarriesMachinePath } from "../../core/facts.js"
 import type { ProjectFacts } from "../../core/types.js"
 import { git, pathExists, readJson } from "../../core/util.js"
 import {
@@ -281,6 +282,13 @@ export const instructionTruthLens: Lens = {
         ...compareArtifacts(ctx.baseline.facts, facts),
         ...compareLayout(ctx.baseline.facts, facts),
       )
+      // Baselines written before the root was elided carry the approver's machine path into a
+      // committed — often published — file. Say so; `approve` clears it.
+      if (baselineCarriesMachinePath(ctx.baseline)) {
+        disclosures.push(
+          `${BASELINE_FILE} records an absolute machine path as its scan root (written by an older etymd). It is committed, so that path is published with your repo — run \`etymd approve\` to rewrite it.`,
+        )
+      }
       if (ctx.baseline.packVersion !== PACK_VERSION) {
         disclosures.push(
           `Baseline was approved under pack v${ctx.baseline.packVersion}; current pack is v${PACK_VERSION}.`,

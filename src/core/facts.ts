@@ -45,8 +45,34 @@ export async function readCachedFacts(root: string): Promise<ProjectFacts | null
   return readJson<ProjectFacts>(cacheFactsPath(root))
 }
 
+/**
+ * The scan's absolute root is a MACHINE path — it carries the author's username and directory
+ * layout. It must never reach the baseline, because the baseline is the one file etymd tells
+ * people to commit (and therefore to publish). It is redundant there anyway: the baseline lives
+ * inside the repo it describes, and `facts.name` already identifies the project.
+ *
+ * True for the gitignored cache too, but that one stays absolute on purpose — it never leaves the
+ * machine, and a wrong-checkout cache is easier to spot with the real path in it.
+ */
+export function withoutMachinePath(facts: ProjectFacts): ProjectFacts {
+  return { ...facts, root: "." }
+}
+
+/** True for a baseline written before the root was elided — its holder should re-approve. */
+export function baselineCarriesMachinePath(baseline: Baseline): boolean {
+  const root = baseline.facts?.root
+  return (
+    typeof root === "string" &&
+    root !== "." &&
+    (root.startsWith("/") || /^[A-Za-z]:[\\/]/.test(root))
+  )
+}
+
 export async function writeBaseline(root: string, baseline: Baseline): Promise<string> {
-  return writeJsonFile(baselinePath(root), baseline)
+  return writeJsonFile(baselinePath(root), {
+    ...baseline,
+    facts: withoutMachinePath(baseline.facts),
+  })
 }
 
 export async function readBaseline(root: string): Promise<Baseline | null> {

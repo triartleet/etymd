@@ -11,6 +11,8 @@ export {
   deriveProfile,
   cacheFactsPath,
   baselinePath,
+  withoutMachinePath,
+  baselineCarriesMachinePath,
   type Baseline,
 } from "./core/facts.js"
 export {
