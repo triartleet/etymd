@@ -104,7 +104,10 @@ over repo-wide scans.
 ## Conventions
 
 - Prettier (no semicolons, double quotes, trailing commas, width 100); `npm run format` before
-  finishing.
+  finishing. A code span ending in a double-star (a `**` glob) must never sit inside bold —
+  Prettier 3.4 mis-pairs the delimiters and silently rewrites the sentence, and `--check` still
+  passes. `guard:md` fails both format scripts when that damage signature (an escaped star-pair)
+  reaches a markdown file.
 - kebab-case filenames; commands mirror their CLI name; comment the why, not the what.
 - Every user-visible output path goes through `src/ui/render.ts` — no ad-hoc `console.log`.
 - `--json` outputs are machine-stable schemas; changing them is a breaking change.
