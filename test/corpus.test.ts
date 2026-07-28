@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
 
 import { describe, expect, it } from "vitest"
@@ -9,8 +9,22 @@ import { instructionTruthLens } from "../src/lenses/instruction-truth/lens.js"
 
 // Read-only smoke tests over the sibling corpus repos — the dogfood harness. Each asserts only
 // durable, hand-verified facts; skipped cleanly on machines without the corpus.
+//
+// Private corpus entries are named here by shape (`nx-monorepo`, …), never by directory. The
+// untracked sources.local.json supplies the real sibling directory on a machine that has them;
+// everywhere else the lookup misses and the suite skips, which is the same path as "repo absent".
 const CORPUS_ROOT = path.resolve(import.meta.dirname, "..", "..")
-const repo = (name: string) => path.join(CORPUS_ROOT, name)
+
+const localDirs: Record<string, string> = (() => {
+  try {
+    const raw = readFileSync(path.join(import.meta.dirname, "..", "sources.local.json"), "utf8")
+    return (JSON.parse(raw) as { dirs?: Record<string, string> }).dirs ?? {}
+  } catch {
+    return {}
+  }
+})()
+
+const repo = (name: string) => path.join(CORPUS_ROOT, localDirs[name] ?? name)
 const hasRepo = (name: string) => existsSync(repo(name))
 
 describe.skipIf(!hasRepo("pepshop"))("corpus: pepshop (control — the gold standard)", () => {

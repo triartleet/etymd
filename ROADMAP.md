@@ -79,7 +79,7 @@ not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.m
   words/tokens per session), so the lens's advice carries a number. Budgets are now per-repo
   configurable, so the next question is what a _right_ budget is, not where it lives.
 - **AI-review gate harvest**: distill the two real advisory AI-review CI jobs living in the corpus
-  (pepshop's claude-review, nx-monorepo's `ai review`) into a `gates --ci` generator.
+  (pepshop's claude-review, and the Nx monorepo's advisory `ai review`) into a `gates --ci` generator.
 
 ## Later (only if the objective still leads)
 

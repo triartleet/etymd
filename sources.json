@@ -1,5 +1,5 @@
 {
-  "$comment": "Corpus manifest — local sibling projects etymd distils its knowledge pack from and validates against (dogfood diff harness). See docs/design/v0.0.1-design.md §2/§10.",
+  "$comment": "Corpus manifest — the sibling repos etymd validates against (the dogfood harness). An entry marked `private` is named by SHAPE, not by directory: its local directory comes from an untracked sources.local.json (see README). Corpus tests skip cleanly wherever a repo is absent.",
   "sources": [
     {
       "name": "pepshop",
@@ -10,24 +10,24 @@
     },
     {
       "name": "nx-monorepo",
-      "path": "../nx-monorepo",
+      "private": true,
       "role": "reference",
-      "shape": "Nx monorepo / Next.js 14",
-      "note": "team-repo leash + reuse-first/INVENTORY.md; monorepo topology coverage"
+      "shape": "Nx monorepo / Next.js",
+      "note": "monorepo topology coverage: meta-vs-narrow command classification, a reuse-first inventory doc, and an advisory AI-review CI job"
     },
     {
       "name": "spa-bff",
-      "path": "../spa-bff",
+      "private": true,
       "role": "reference",
       "shape": "single-repo React SPA + Express BFF",
-      "note": "non-monorepo client/server split coverage"
+      "note": "non-monorepo client/server split coverage; Copilot-instructions dialect"
     },
     {
       "name": "cra-legacy",
-      "path": "../cra-legacy",
+      "private": true,
       "role": "reference",
-      "shape": "CRA + Apollo + husky/lint-staged",
-      "note": "CRA/husky command-set + hook-setup coverage"
+      "shape": "CRA + Apollo + husky v3/lint-staged",
+      "note": "legacy command-set and hook-setup coverage; the script-less coverage job that motivated the gate-integrity honesty rules"
     },
     {
       "name": "cc-gg-bridgy",
@@ -48,7 +48,7 @@
       "path": "../nanoclaw-v2",
       "role": "reference",
       "shape": "pnpm + Bun fork of an active upstream OSS assistant",
-      "note": "large claim-rich surface: 29KB CLAUDE.md, symlinked+gitignored AGENTS.md, husky; onboarding pending"
+      "note": "large claim-rich surface: 29KB CLAUDE.md, symlinked+gitignored AGENTS.md, husky; the fork-scoping case"
     }
   ]
 }

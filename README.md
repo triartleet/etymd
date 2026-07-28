@@ -135,6 +135,25 @@ const audit = await runAudit(process.cwd(), { persistLedger: false })
 console.log(audit.findings) // one schema: claim · evidence · why · action · effort · confidence
 ```
 
+## The corpus (how this is validated)
+
+etymd is developed against a corpus of real sibling repos rather than fixtures alone —
+[`sources.json`](sources.json) lists them by shape. Every heuristic here exists because a real
+repo proved the previous one wrong, and each skip class in the truth lens is a false positive that
+a corpus run caught.
+
+Some corpus entries are private and are named by shape (`nx-monorepo`, `spa-bff`, `cra-legacy`)
+rather than by directory. To run those smokes locally, add an untracked `sources.local.json`
+mapping each name to its sibling directory:
+
+```json
+{ "dirs": { "nx-monorepo": "my-monorepo-checkout" } }
+```
+
+Each value is resolved as a sibling of the etymd checkout.
+
+Without it — on a fresh clone or in CI — those suites skip cleanly and the rest still run.
+
 ## Design record & roadmap
 
 [`docs/design/`](docs/design/) — 001 founding · 002 foundation re-lock · **003 the truth-guard

@@ -51,7 +51,7 @@ describe("expandScriptRefs / matchTools", () => {
   })
 })
 
-// The cra-legacy-shaped fixture, faithful to the real repo: sonar job with NO local script (it lives
+// The cra-legacy-shaped fixture, faithful to the real private repo: sonar job with NO local script (it lives
 // in the org template) but SONAR_* variables + allow_failure; husky-v3 + lint-staged
 // prettier-only locally; coverage collected but no threshold; commitlint installed but unwired;
 // an org include the tool cannot read; !reference tags that must not break parsing.
@@ -150,7 +150,7 @@ describe("buildGateInventory (cra-legacy-shaped fixture)", () => {
     expect(ids).toContain("gate-integrity/ci-only-lint")
     expect(ids).toContain("gate-integrity/ci-only-test")
 
-    // The motivating cra-legacy case, phrased humbly about the server-side threshold.
+    // The motivating legacy-repo case, phrased humbly about the server-side threshold.
     const coverage = findings.find((f) => f.id === "gate-integrity/coverage-no-local-threshold")
     expect(coverage).toBeDefined()
     expect(coverage?.claim).toContain("server-side")

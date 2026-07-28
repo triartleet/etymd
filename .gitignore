@@ -8,3 +8,5 @@ coverage/
 .env.*
 !.env.example
 .etymd/cache/
+# Local-only map from a private corpus entry's public name to its sibling directory.
+sources.local.json
