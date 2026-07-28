@@ -44,6 +44,7 @@ export {
   extractCommandClaims,
   extractPathClaims,
   listInstructionFiles,
+  type PathClaims,
   type InstructionFileSet,
 } from "./lenses/instruction-truth/claims.js"
 export { contextEconomyLens, TOTAL_BUDGET_WORDS } from "./lenses/context-economy.js"

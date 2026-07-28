@@ -61,7 +61,7 @@ describe("claim extraction", () => {
   })
 
   it("extracts conservative path claims only", () => {
-    const paths = extractPathClaims(
+    const { paths } = extractPathClaims(
       [
         "See `src/core/detect.ts` and `docs/design/` for details.",
         "Routes live at `/admin/batches` and `~/home` and `@scope/pkg`.",
@@ -73,6 +73,45 @@ describe("claim extraction", () => {
       ].join("\n"),
     )
     expect(paths.sort()).toEqual(["docs/design", "src/core/detect.ts"])
+  })
+
+  it("treats create-this paths as prospective, not claims (the nanoclaw skill class)", () => {
+    const { paths, prospective } = extractPathClaims(
+      [
+        "Create `migrations/quarantine/` before starting the move.",
+        "The build writes to `dist/report.json` on every run.",
+        "Files this step generates:",
+        "- `docs/generated/api.md`",
+        "- `docs/generated/cli.md`",
+        "The engine lives in `src/engine/run.ts`.",
+      ].join("\n"),
+    )
+    expect(prospective.sort()).toEqual([
+      "dist/report.json",
+      "docs/generated/api.md",
+      "docs/generated/cli.md",
+      "migrations/quarantine",
+    ])
+    expect(paths).toEqual(["src/engine/run.ts"])
+  })
+
+  it("still verifies a path that is also referenced outside create-this prose", () => {
+    const { paths, prospective } = extractPathClaims(
+      ["Create `src/gen/out.ts` first.", "Then read `src/gen/out.ts` to check the result."].join(
+        "\n",
+      ),
+    )
+    // One plain reference makes it a live claim — a stale path must not hide behind one mention.
+    expect(paths).toEqual(["src/gen/out.ts"])
+    expect(prospective).toEqual([])
+  })
+
+  it("treats naming stand-ins as placeholders, never claims", () => {
+    const { paths, placeholder } = extractPathClaims(
+      "Add `.claude/skills/my-custom-skill/SKILL.md` alongside `.claude/skills/deploy/SKILL.md`.",
+    )
+    expect(placeholder).toEqual([".claude/skills/my-custom-skill/SKILL.md"])
+    expect(paths).toEqual([".claude/skills/deploy/SKILL.md"])
   })
 })
 
@@ -198,6 +237,34 @@ describe("instruction-truth lens (the lying-AGENTS.md fixture)", () => {
     expect(ids).not.toContain("instruction-truth/stale-path:AGENTS.md:apps/api/.env")
     expect(ids).toContain("instruction-truth/stale-path:AGENTS.md:apps/api/gone.ts")
     expect(report.disclosures.some((d) => d.includes("gitignored"))).toBe(true)
+  })
+
+  it("does not accuse a path the file tells the agent to create", async () => {
+    await write("package.json", JSON.stringify({ name: "prospective", scripts: {} }))
+    await write("pnpm-lock.yaml", "")
+    await write("node_modules/.bin/.keep", "")
+    await write(
+      ".claude/skills/migrate/SKILL.md",
+      [
+        "# Migrate",
+        "Create `migrations/quarantine/` and move the legacy files there.",
+        "Scaffold your own step at `.claude/skills/my-custom-skill/SKILL.md`.",
+        "The rollback notes live in `docs/rollback.md`.",
+      ].join("\n\n"),
+    )
+    const report = await runTruth()
+    const ids = report.findings.map((f) => f.id)
+    // Neither the dir the skill creates nor the naming stand-in is a stale reference…
+    expect(ids).not.toContain(
+      "instruction-truth/stale-path:.claude/skills/migrate/SKILL.md:migrations/quarantine",
+    )
+    expect(ids.some((i) => i.includes("my-custom-skill"))).toBe(false)
+    // …but a plain missing reference in the same file still is.
+    expect(ids).toContain(
+      "instruction-truth/stale-path:.claude/skills/migrate/SKILL.md:docs/rollback.md",
+    )
+    expect(report.disclosures.some((d) => d.includes("create-this prose"))).toBe(true)
+    expect(report.disclosures.some((d) => d.includes("naming stand-ins"))).toBe(true)
   })
 
   it("covers cursor rules and skills files too", async () => {

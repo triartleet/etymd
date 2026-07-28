@@ -163,6 +163,8 @@ export const instructionTruthLens: Lens = {
     let binaryResolved = 0
     let unverifiableCommands = 0
     let gitignoredSkipped = 0
+    let prospectiveSkipped = 0
+    let placeholderSkipped = 0
 
     for (const file of files) {
       // Command claims: a script the file tells agents to run must exist somewhere real.
@@ -193,7 +195,9 @@ export const instructionTruthLens: Lens = {
       }
 
       // Path claims: a path the file points agents at must exist.
-      const paths = extractPathClaims(file.text)
+      const { paths, prospective, placeholder } = extractPathClaims(file.text)
+      prospectiveSkipped += prospective.length
+      placeholderSkipped += placeholder.length
       const missing: string[] = []
       for (const claim of paths) {
         if (!(await pathResolves(claim))) missing.push(claim)
@@ -303,6 +307,16 @@ export const instructionTruthLens: Lens = {
         `${gitignoredSkipped} missing path claim(s) are gitignored (machine-local, e.g. .env) — existence is not verifiable from the repo; skipped, not flagged.`,
       )
     }
+    if (prospectiveSkipped) {
+      disclosures.push(
+        `${prospectiveSkipped} path claim(s) sit in create-this prose (the file instructs generating them) — forward-looking, not stale; skipped, not flagged.`,
+      )
+    }
+    if (placeholderSkipped) {
+      disclosures.push(
+        `${placeholderSkipped} path claim(s) are naming stand-ins (e.g. \`my-custom-skill\`) rather than real references; skipped, not flagged.`,
+      )
+    }
     // Scoping narrows what this lens can see, so it is stated up front and by name — an audit
     // that looks clean because the lying files were excluded must say so itself.
     if (excluded.length) {
@@ -317,7 +331,7 @@ export const instructionTruthLens: Lens = {
       )
     }
     disclosures.push(
-      `Checked ${files.length} instruction file(s); commands resolved against root + ${facts.packages.length} workspace manifest(s) plus installed binaries; paths matched against root and package roots. Heuristics: workspace-filtered commands skipped (${totalFilteredSkipped}); tokens without a recognized extension treated as prose (a dir claim needs a trailing slash); gitignored claims unverifiable; absolute/globbed/placeholder tokens skipped; framework-pattern staleness not checked.`,
+      `Checked ${files.length} instruction file(s); commands resolved against root + ${facts.packages.length} workspace manifest(s) plus installed binaries; paths matched against root and package roots. Heuristics: workspace-filtered commands skipped (${totalFilteredSkipped}); tokens without a recognized extension treated as prose (a dir claim needs a trailing slash); gitignored claims unverifiable; create-this and stand-in path claims skipped; absolute/globbed/placeholder tokens skipped; framework-pattern staleness not checked.`,
     )
 
     return {

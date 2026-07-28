@@ -210,14 +210,68 @@ const KNOWN_EXTENSIONS = new Set([
   ).split(" "),
 ])
 
+// A path the surrounding prose tells the agent to CREATE is not a stale reference — it is a
+// forward-looking instruction, and the repo is right to lack it. Harvested from the nanoclaw-v2
+// first audit (migration quarantine dirs, generated outputs), the second new skip class after
+// Better-Auth dotted notation.
+const CREATION_CONTEXT_RE =
+  /\b(?:creat(?:e|es|ed|ing)|generat(?:e|es|ed|ing)|scaffold(?:s|ed|ing)?|quarantin(?:e|es|ed|ing)|(?:writ(?:e|es|ten|ing)|output(?:s|ted)?|emit(?:s|ted|ting)?|sav(?:e|es|ed|ing)|mov(?:e|es|ed|ing)|copy|copi(?:es|ed))\s+(?:it\s+|them\s+)?(?:to|into)|new\s+(?:file|directory|folder)|will\s+(?:be\s+)?(?:created|generated|written)|add(?:s|ed|ing)?\s+(?:a|the)\s+new)\b/i
+
+// Naming stand-ins an instruction file uses to describe a shape, not to point at a real path.
+const PLACEHOLDER_SEGMENTS = new Set(["placeholder", "foo", "bar", "baz", "qux"])
+const PLACEHOLDER_PREFIX_RE = /^(?:my|your)-/i
+
+function isPlaceholderClaim(token: string): boolean {
+  return token
+    .split("/")
+    .some((seg) => PLACEHOLDER_PREFIX_RE.test(seg) || PLACEHOLDER_SEGMENTS.has(seg.toLowerCase()))
+}
+
+/**
+ * The prose around one occurrence: its own line, plus the lead-in line when the claim sits in a
+ * list item or table row ("Files this creates:" followed by bulleted paths is the common shape).
+ */
+function claimContext(text: string, index: number): string {
+  const start = text.lastIndexOf("\n", index) + 1
+  const endRaw = text.indexOf("\n", index)
+  const end = endRaw === -1 ? text.length : endRaw
+  const line = text.slice(start, end)
+  if (!/^\s*(?:[-*+]|\d+[.)]|\|)/.test(line)) return line
+
+  // Walk back to the nearest non-empty, non-list line — the sentence the list hangs off.
+  let cursor = start
+  while (cursor > 0) {
+    const prevEnd = cursor - 1
+    const prevStart = text.lastIndexOf("\n", prevEnd - 1) + 1
+    const prev = text.slice(prevStart, prevEnd)
+    cursor = prevStart
+    if (!prev.trim()) continue
+    if (/^\s*(?:[-*+]|\d+[.)]|\|)/.test(prev)) continue
+    return `${prev}\n${line}`
+  }
+  return line
+}
+
+export interface PathClaims {
+  /** Claims to verify against the repo. */
+  paths: string[]
+  /** Claims whose every mention sits in create-this prose — skipped, counted, disclosed. */
+  prospective: string[]
+  /** Naming stand-ins (`my-custom-skill`) — never real claims. */
+  placeholder: string[]
+}
+
 /**
  * Repo-relative path claims from single-token inline spans, conservatively filtered. The
  * load-bearing precision rule (learned from real corpus prose): an extensionless bare token
  * (`research/trust`, `milestone/mNN`) is prose — a dir claim must end with `/`, a file claim
  * must carry an extension.
  */
-export function extractPathClaims(text: string): string[] {
-  const out = new Set<string>()
+export function extractPathClaims(text: string): PathClaims {
+  // Per claim: does EVERY mention sit in create-this prose? One plain reference makes it a claim.
+  const prospectiveOnly = new Map<string, boolean>()
+  const placeholder = new Set<string>()
+
   for (const m of text.matchAll(/`([^`\n]+)`/g)) {
     const token = (m[1] as string).trim()
     if (token.includes(" ") || token.length > 120) continue
@@ -237,9 +291,23 @@ export function extractPathClaims(text: string): string[] {
     const isDirClaim = token.endsWith("/")
     const ext = token.toLowerCase().match(/\.([a-z0-9]{1,8})$/)?.[1]
     if (!isDirClaim && !(ext && KNOWN_EXTENSIONS.has(ext))) continue
-    out.add(token.replace(/\/$/, ""))
+
+    const claim = token.replace(/\/$/, "")
+    if (isPlaceholderClaim(claim)) {
+      placeholder.add(claim)
+      continue
+    }
+    const prospective = CREATION_CONTEXT_RE.test(claimContext(text, m.index ?? 0))
+    prospectiveOnly.set(claim, (prospectiveOnly.get(claim) ?? true) && prospective)
   }
-  return [...out]
+
+  const paths: string[] = []
+  const prospective: string[] = []
+  for (const [claim, only] of prospectiveOnly) {
+    if (only) prospective.push(claim)
+    else paths.push(claim)
+  }
+  return { paths, prospective, placeholder: [...placeholder] }
 }
 
 /** How often each package manager is used in command position — the consistency signal. */
