@@ -71,17 +71,18 @@ export function relativizePath(root: string, p: string): string {
  * would fail the very gate this tool tells people to add. `CI` is set by every mainstream runner;
  * the named vars are belt-and-braces.
  */
+export const CI_ENV_VARS = [
+  "CI",
+  "GITHUB_ACTIONS",
+  "GITLAB_CI",
+  "BUILDKITE",
+  "CIRCLECI",
+  "JENKINS_URL",
+  "TF_BUILD",
+] as const
+
 export function isCiEnvironment(): boolean {
-  const env = process.env
-  return Boolean(
-    env.CI ||
-      env.GITHUB_ACTIONS ||
-      env.GITLAB_CI ||
-      env.BUILDKITE ||
-      env.CIRCLECI ||
-      env.JENKINS_URL ||
-      env.TF_BUILD,
-  )
+  return CI_ENV_VARS.some((v) => Boolean(process.env[v]))
 }
 
 /** Repo-relative POSIX form: `\` → `/`, no leading `./`, no trailing `/`. */

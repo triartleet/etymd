@@ -5,6 +5,7 @@ import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { scanProject } from "../src/core/scan.js"
+import { CI_ENV_VARS } from "../src/core/util.js"
 import { deriveGateFindings } from "../src/lenses/gate-integrity/lens.js"
 import {
   buildGateInventory,
@@ -212,27 +213,32 @@ describe("hook wiring is a developer-machine fact, not a CI one", () => {
     thresholds: {},
   } as unknown as Parameters<typeof deriveGateFindings>[0]
 
-  const withCi = <T>(value: string | undefined, fn: () => T): T => {
-    const before = process.env.CI
-    if (value === undefined) delete process.env.CI
-    else process.env.CI = value
+  // Clears/sets EVERY var the detector consults, driven by the exported list rather than a
+  // hand-copied one — the first version of this test only cleared `CI` and so failed inside
+  // GitHub Actions, which also sets GITHUB_ACTIONS.
+  const withCi = <T>(inCi: boolean, fn: () => T): T => {
+    const before = CI_ENV_VARS.map((v) => [v, process.env[v]] as const)
+    for (const v of CI_ENV_VARS) delete process.env[v]
+    if (inCi) process.env.CI = "true"
     try {
       return fn()
     } finally {
-      if (before === undefined) delete process.env.CI
-      else process.env.CI = before
+      for (const [v, value] of before) {
+        if (value === undefined) delete process.env[v]
+        else process.env[v] = value
+      }
     }
   }
 
   it("flags unwired hooks on a developer machine", () => {
     const disclosures: string[] = []
-    const ids = withCi(undefined, () => deriveGateFindings(inv, disclosures)).map((f) => f.id)
+    const ids = withCi(false, () => deriveGateFindings(inv, disclosures)).map((f) => f.id)
     expect(ids).toContain("gate-integrity/hooks-not-wired")
   })
 
   it("skips and discloses instead of flagging when running in CI", () => {
     const disclosures: string[] = []
-    const ids = withCi("true", () => deriveGateFindings(inv, disclosures)).map((f) => f.id)
+    const ids = withCi(true, () => deriveGateFindings(inv, disclosures)).map((f) => f.id)
     expect(ids).not.toContain("gate-integrity/hooks-not-wired")
     expect(disclosures.some((d) => d.includes("Running in CI"))).toBe(true)
   })
