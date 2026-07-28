@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
+import { DEFAULT_CONFIG } from "./config.js"
 import type { ContextBudget, ContextFile } from "./types.js"
 import { approxTokens, pathExists, readText, wordCount } from "./util.js"
 
@@ -14,8 +15,11 @@ const ALWAYS_LOADED: { path: string; role: string }[] = [
   { path: ".cursorrules", role: "Cursor rules (legacy)" },
 ]
 
-/** Above this word count a single always-loaded file is worth extracting into an on-demand skill. */
-const EXTRACTION_THRESHOLD = 4000
+/**
+ * Default word count above which a single always-loaded file is worth extracting into an
+ * on-demand skill. Overridable per repo via `context.perFileWords` in `.etymd/config.json`.
+ */
+const EXTRACTION_THRESHOLD = DEFAULT_CONFIG.context.perFileWords
 
 /**
  * A Cursor rule only loads every session when it is genuinely always-applied. Scoped rules
@@ -29,7 +33,10 @@ export function isAlwaysAppliedCursorRule(text: string): boolean {
   return /^\s*alwaysApply\s*:\s*true\s*$/m.test(frontmatter)
 }
 
-export async function measureContext(root: string): Promise<ContextBudget> {
+export async function measureContext(
+  root: string,
+  perFileWords: number = EXTRACTION_THRESHOLD,
+): Promise<ContextBudget> {
   const files: ContextFile[] = []
 
   for (const spec of ALWAYS_LOADED) {
@@ -65,7 +72,8 @@ export async function measureContext(root: string): Promise<ContextBudget> {
     files: files.sort((a, b) => b.words - a.words),
     totalWords,
     totalApproxTokens: approxTokens(totalWords),
-    extractionCandidates: files.filter((f) => f.words >= EXTRACTION_THRESHOLD),
+    perFileWords,
+    extractionCandidates: files.filter((f) => f.words >= perFileWords),
   }
 }
 

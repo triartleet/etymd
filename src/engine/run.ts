@@ -7,6 +7,7 @@ import {
   writeCachedFacts,
   type Baseline,
 } from "../core/facts.js"
+import { readConfig, type LoadedConfig } from "../core/config.js"
 import { scanProject } from "../core/scan.js"
 import { pathExists } from "../core/util.js"
 import type { ProjectFacts } from "../core/types.js"
@@ -46,6 +47,7 @@ export interface AuditResult {
   facts: ProjectFacts
   profile: WorkflowProfile
   baseline: Baseline | null
+  config: LoadedConfig
   reports: LensReport[]
   /** Ranked, dismissed-filtered — what the report shows. */
   findings: Finding[]
@@ -61,6 +63,7 @@ export async function runAudit(root: string, opts: AuditOptions = {}): Promise<A
     await writeCachedFacts(root, facts)
   }
   const baseline = await readBaseline(root)
+  const config = await readConfig(root)
   const profile = baseline?.profile ?? deriveProfile(facts)
 
   const selected = LENSES.filter(
@@ -71,7 +74,7 @@ export async function runAudit(root: string, opts: AuditOptions = {}): Promise<A
   const reports: LensReport[] = []
   for (const lens of selected) {
     try {
-      reports.push(await lens.run({ root, facts, profile, baseline }))
+      reports.push(await lens.run({ root, facts, profile, baseline, config }))
     } catch (err) {
       reports.push({
         lens: lens.id,
@@ -100,6 +103,7 @@ export async function runAudit(root: string, opts: AuditOptions = {}): Promise<A
     facts,
     profile,
     baseline,
+    config,
     reports,
     findings: rankFindings(visibleFindings(all, previous)),
     ledger,

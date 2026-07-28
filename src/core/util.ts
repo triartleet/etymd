@@ -64,3 +64,52 @@ export function relativizePath(root: string, p: string): string {
   const r = path.relative(root, p)
   return r === "" ? "." : r
 }
+
+/** Repo-relative POSIX form: `\` → `/`, no leading `./`, no trailing `/`. */
+export function normalizeRelPath(p: string): string {
+  return p.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, "")
+}
+
+function globToRegExp(glob: string): RegExp {
+  let re = ""
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i] as string
+    if (c === "*") {
+      if (glob[i + 1] === "*") {
+        i += 1
+        // `a/**/b` must also match `a/b` — swallow the separator so `**` can span zero segments.
+        if (glob[i + 1] === "/") {
+          i += 1
+          re += "(?:.*/)?"
+        } else {
+          re += ".*"
+        }
+      } else {
+        re += "[^/]*"
+      }
+    } else if (c === "?") {
+      re += "[^/]"
+    } else {
+      re += c.replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    }
+  }
+  return new RegExp(`^${re}$`)
+}
+
+/**
+ * Match a repo-relative path against a minimal glob (`*` within a segment, `**` across segments,
+ * `?` one character). Bounded and dependency-free, like the workspace-glob expansion in detect.ts.
+ * A wildcard-free pattern is a path prefix — `.claude/skills` covers everything under it, which is
+ * how a human writing an exclude list expects it to read.
+ */
+export function matchesGlob(p: string, glob: string): boolean {
+  const target = normalizeRelPath(p)
+  const pattern = normalizeRelPath(glob)
+  if (!pattern) return false
+  if (!/[*?]/.test(pattern)) return target === pattern || target.startsWith(pattern + "/")
+  return globToRegExp(pattern).test(target)
+}
+
+export function matchesAnyGlob(p: string, globs: string[]): boolean {
+  return globs.some((g) => matchesGlob(p, g))
+}

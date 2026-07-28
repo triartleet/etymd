@@ -2,6 +2,7 @@ import path from "node:path"
 
 import { PACK_VERSION } from "../../pack/version.js"
 import type { Finding, Lens, LensContext, LensReport } from "../../engine/finding.js"
+import { CONFIG_FILE, DEFAULT_CONFIG } from "../../core/config.js"
 import type { ProjectFacts } from "../../core/types.js"
 import { git, pathExists, readJson } from "../../core/util.js"
 import {
@@ -101,7 +102,14 @@ export const instructionTruthLens: Lens = {
     const disclosures: string[] = []
     const { facts, root } = ctx
 
-    const files = await listInstructionFiles(root, facts)
+    const config = ctx.config?.config ?? DEFAULT_CONFIG
+    disclosures.push(...(ctx.config?.problems ?? []))
+
+    const {
+      files,
+      excluded,
+      included: includedExtra,
+    } = await listInstructionFiles(root, facts, config.instructions)
 
     if (!files.length) {
       findings.push(
@@ -293,6 +301,19 @@ export const instructionTruthLens: Lens = {
     if (gitignoredSkipped) {
       disclosures.push(
         `${gitignoredSkipped} missing path claim(s) are gitignored (machine-local, e.g. .env) — existence is not verifiable from the repo; skipped, not flagged.`,
+      )
+    }
+    // Scoping narrows what this lens can see, so it is stated up front and by name — an audit
+    // that looks clean because the lying files were excluded must say so itself.
+    if (excluded.length) {
+      const shown = excluded.slice(0, 5).join(", ")
+      disclosures.push(
+        `${excluded.length} instruction file(s) excluded by ${CONFIG_FILE} and NOT audited: ${shown}${excluded.length > 5 ? `, +${excluded.length - 5} more` : ""}.`,
+      )
+    }
+    if (includedExtra.length) {
+      disclosures.push(
+        `${includedExtra.length} extra instruction file(s) audited via ${CONFIG_FILE} \`instructions.include\`: ${includedExtra.slice(0, 5).join(", ")}${includedExtra.length > 5 ? `, +${includedExtra.length - 5} more` : ""}.`,
       )
     }
     disclosures.push(

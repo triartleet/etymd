@@ -13,6 +13,16 @@ export {
   baselinePath,
   type Baseline,
 } from "./core/facts.js"
+export {
+  readConfig,
+  configPath,
+  CONFIG_FILE,
+  DEFAULT_CONFIG,
+  type EtymdConfig,
+  type LoadedConfig,
+  type InstructionScope,
+  type ContextBudgets,
+} from "./core/config.js"
 export { runAudit, LENSES, type AuditResult, type AuditOptions } from "./engine/run.js"
 export {
   rankFindings,
@@ -34,6 +44,7 @@ export {
   extractCommandClaims,
   extractPathClaims,
   listInstructionFiles,
+  type InstructionFileSet,
 } from "./lenses/instruction-truth/claims.js"
 export { contextEconomyLens, TOTAL_BUDGET_WORDS } from "./lenses/context-economy.js"
 export {

@@ -10,7 +10,14 @@ import type {
   PackageManager,
   WorkspaceKind,
 } from "./types.js"
-import { isDirectory, pathExists, readJson, readText } from "./util.js"
+import {
+  isDirectory,
+  matchesAnyGlob,
+  normalizeRelPath,
+  pathExists,
+  readJson,
+  readText,
+} from "./util.js"
 
 export interface PackageJson {
   name?: string
@@ -136,6 +143,57 @@ export async function listWorkspacePackages(root: string, globs: string[]): Prom
     }
   }
   return found.sort((a, b) => a.dir.localeCompare(b.dir))
+}
+
+/**
+ * Expand file globs into concrete repo-relative files. Walks only the literal prefix of each
+ * glob (`design/**` walks `design/`, never the whole repo), so the cost stays proportional to
+ * what was asked for and an explicitly named dot-dir stays reachable.
+ */
+export async function expandFileGlobs(root: string, globs: string[], cap = 500): Promise<string[]> {
+  if (!globs.length) return []
+  const out = new Set<string>()
+
+  const walk = async (rel: string) => {
+    if (out.size >= cap) return
+    let entries: import("node:fs").Dirent[]
+    try {
+      entries = await fs.readdir(path.join(root, rel), { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (out.size >= cap) return
+      if (IGNORED_DIRS.has(entry.name)) continue
+      const child = rel ? `${rel}/${entry.name}` : entry.name
+      if (entry.isDirectory()) await walk(child)
+      else if (entry.isFile() && matchesAnyGlob(child, globs)) out.add(child)
+    }
+  }
+
+  // One walk root per glob: everything before its first wildcard segment.
+  const roots = new Set<string>()
+  for (const glob of globs) {
+    const segments = normalizeRelPath(glob).split("/")
+    const literal: string[] = []
+    for (const seg of segments) {
+      if (/[*?]/.test(seg)) break
+      literal.push(seg)
+    }
+    // A wildcard-free glob names a file (or a dir prefix); drop the last segment to get a dir.
+    if (literal.length === segments.length) literal.pop()
+    roots.add(literal.join("/"))
+  }
+  // Drop walk roots already covered by an ancestor root.
+  const minimal = [...roots].filter(
+    (r) => ![...roots].some((other) => other !== r && (other === "" || r.startsWith(other + "/"))),
+  )
+  for (const r of minimal) {
+    if (r && !(await isDirectory(path.join(root, r)))) continue
+    await walk(r)
+  }
+
+  return [...out].sort()
 }
 
 type CommandRole = Exclude<keyof DiscoveredCommands, "raw">

@@ -45,6 +45,8 @@ export interface LensContext {
   profile: WorkflowProfile
   /** The committed, approved reckoning — what truth lenses measure drift against. */
   baseline: import("../core/facts.js").Baseline | null
+  /** The repo's optional `.etymd/config.json` (scope + budgets); defaults when absent. */
+  config?: import("../core/config.js").LoadedConfig
 }
 
 /** Solo vs team changes what counts as a gap (state docs and session archives are solo ritual). */

@@ -101,6 +101,8 @@ export interface ContextBudget {
   files: ContextFile[]
   totalWords: number
   totalApproxTokens: number
+  /** The per-file threshold this measurement used (config-overridable). */
+  perFileWords: number
   /** Files large enough to be worth extracting into an on-demand skill. */
   extractionCandidates: ContextFile[]
 }

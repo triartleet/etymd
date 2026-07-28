@@ -1,8 +1,10 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
+import type { InstructionScope } from "../../core/config.js"
+import { expandFileGlobs } from "../../core/detect.js"
 import type { ProjectFacts } from "../../core/types.js"
-import { isDirectory, readText } from "../../core/util.js"
+import { isDirectory, matchesAnyGlob, normalizeRelPath, readText } from "../../core/util.js"
 
 // Claim extraction: what an instruction file ASSERTS about the repo. Precision beats recall
 // here — a false "your file is lying" costs more trust than a missed lie, so every heuristic
@@ -14,15 +16,30 @@ export interface InstructionFile {
   text: string
 }
 
-/** Every agent-facing instruction file the scan knows how to find. */
+export interface InstructionFileSet {
+  /** The files the lens will actually audit. */
+  files: InstructionFile[]
+  /** Auto-detected files dropped by `instructions.exclude` — counted so scoping stays visible. */
+  excluded: string[]
+  /** Files pulled in by `instructions.include` that detection would have missed. */
+  included: string[]
+}
+
+/**
+ * Every agent-facing instruction file the scan knows how to find, then narrowed by the repo's
+ * optional scope: auto-detected ∪ `include`, minus `exclude`. The excluded set is returned rather
+ * than discarded — a scoped audit that quietly looked clean would be the exact dishonesty this
+ * tool exists to catch.
+ */
 export async function listInstructionFiles(
   root: string,
   facts: ProjectFacts,
-): Promise<InstructionFile[]> {
+  scope?: InstructionScope,
+): Promise<InstructionFileSet> {
   const files: InstructionFile[] = []
   const add = async (rel: string) => {
     const text = await readText(path.join(root, rel))
-    if (text !== null) files.push({ path: rel, text })
+    if (text !== null) files.push({ path: normalizeRelPath(rel), text })
   }
 
   const singleFileArtifacts = [
@@ -63,7 +80,25 @@ export async function listInstructionFiles(
     }
   }
 
-  return files
+  const detected = new Set(files.map((f) => f.path))
+  const included: string[] = []
+  for (const rel of await expandFileGlobs(root, scope?.include ?? [])) {
+    if (detected.has(rel)) continue
+    const before = files.length
+    await add(rel)
+    if (files.length > before) included.push(rel)
+  }
+
+  const exclude = scope?.exclude ?? []
+  if (!exclude.length) return { files, excluded: [], included }
+
+  const kept: InstructionFile[] = []
+  const excluded: string[] = []
+  for (const file of files) {
+    if (matchesAnyGlob(file.path, exclude)) excluded.push(file.path)
+    else kept.push(file)
+  }
+  return { files: kept, excluded, included }
 }
 
 /** Inline code spans + fenced-code lines — where command and path claims live. */

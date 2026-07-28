@@ -1,4 +1,5 @@
-import { EXTRACTION_THRESHOLD, measureContext } from "../core/context.js"
+import { readConfig } from "../core/config.js"
+import { measureContext } from "../core/context.js"
 import { print, renderContext } from "../ui/render.js"
 
 export interface ContextOptions {
@@ -7,12 +8,14 @@ export interface ContextOptions {
 }
 
 export async function run(opts: ContextOptions): Promise<void> {
-  const budget = await measureContext(opts.cwd)
+  const { config, problems } = await readConfig(opts.cwd)
+  const budget = await measureContext(opts.cwd, config.context.perFileWords)
 
   if (opts.json) {
     print(JSON.stringify(budget, null, 2))
     return
   }
 
-  renderContext(budget, EXTRACTION_THRESHOLD)
+  for (const problem of problems) print(problem)
+  renderContext(budget, budget.perFileWords)
 }
