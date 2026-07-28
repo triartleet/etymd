@@ -56,7 +56,8 @@ node dist/cli.js …`) until the first npm release.
 - **Command claims** — every `pnpm X` / `npm run X` the files tell agents to run must exist in
   `package.json` scripts.
 - **Path claims** — every repo path the files point at must exist (conservative heuristics; what's
-  skipped is disclosed).
+  skipped is disclosed). A path the surrounding prose tells the agent to _create_, and an obvious
+  naming stand-in like `my-custom-skill`, are forward-looking instructions, not stale references.
 - **Package-manager consistency** — instructions must not command `yarn` in a `pnpm` repo.
 - **Cross-references** — pointer chains (`CLAUDE.md` → `AGENTS.md` → state docs) must resolve.
 - **Drift vs baseline** — documented commands/artifacts/layout that existed at approval and are
@@ -92,7 +93,35 @@ is the dominant cost of the loop; a lean contract is a correctness feature.
 | ---------------------- | ------------- | ------------------------------------------------ |
 | `.etymd/baseline.json` | **committed** | the approved reckoning drift is measured against |
 | `.etymd/ledger.json`   | **committed** | the findings memory: statuses, diffs, dismissals |
+| `.etymd/config.json`   | **committed** | optional: audit scope + context budgets          |
 | `.etymd/cache/`        | gitignored    | transient scan cache                             |
+
+### `.etymd/config.json` (optional)
+
+Every key is optional; omit the file entirely and the defaults below apply.
+
+```jsonc
+{
+  "instructions": {
+    // Audit these too — files detection would not find on its own.
+    "include": ["design/**/*.md"],
+    // Leave these out. The classic case: a fork that inherits upstream's skills
+    // and will never fix them, but must keep its OWN instruction layer honest.
+    "exclude": [".claude/skills/**"],
+  },
+  "context": {
+    "perFileWords": 4000, // extraction candidate above this
+    "totalWords": 8000, // always-loaded footprint budget
+  },
+}
+```
+
+Globs are repo-relative: `*` within a path segment, `**` across segments, `?` one character. A
+pattern with no wildcard is a **path prefix**, so `.claude/skills` covers everything beneath it.
+
+Narrowing an audit can hide findings, so etymd never lets it happen quietly: **every excluded file
+is counted and named in the lens disclosures**, and a config that fails to parse is reported as a
+disclosure rather than silently falling back to defaults.
 
 ## Programmatic use
 

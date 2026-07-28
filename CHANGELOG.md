@@ -16,6 +16,11 @@ rationale are recorded in `docs/design/003-truth-guard-pivot.md`.)
   - **context-economy**: the always-loaded footprint in words/tokens; extraction candidates.
   - Ranked findings (risk → gap → polish) with evidence · a **committed ledger** (resolved /
     regressed / dismissed-never-resurfaces) · lens-coverage reporting · `--fail-on <tier>` for CI.
+- **`.etymd/config.json`** (optional, committed) — `instructions.include` / `instructions.exclude`
+  globs scope which instruction files are audited (a fork keeps its own layer honest without
+  auditing inherited upstream skills), and `context.perFileWords` / `context.totalWords` make the
+  economy budgets per-repo. Excluded files are counted and named in the disclosures, and malformed
+  config is disclosed — narrowing an audit can never quietly buy a clean report.
 - `etymd init` — onboarding: approve the committed baseline, gitignore the cache, scaffold a
   minimal AGENTS.md only where none exists. Never overwrites.
 - `etymd doctor` — alias for `audit --truth`.

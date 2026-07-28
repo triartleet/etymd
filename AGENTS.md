@@ -53,9 +53,10 @@ over repo-wide scans.
 - `src/commands/` — thin command adapters (audit · init · approve · scan · doctor · context ·
   brief · gates · ledger[dismiss/accept]); no business logic here
 - `src/core/` — the deterministic engine: `scan.ts` (orchestrator) · `detect.ts` (detectors +
-  classifier ladders) · `facts.ts` (cache vs committed baseline, profile, baseline-drift summary
-  for `approve`) · `context.ts` · `generate.ts` (onboarding planner) · `apply.ts` (idempotent
-  writes) · `types.ts` · `util.ts`
+  classifier ladders + glob expansion) · `facts.ts` (cache vs committed baseline, profile,
+  baseline-drift summary for `approve`) · `config.ts` (the optional committed config file under
+  `.etymd/`: instruction scope + context budgets) · `context.ts` · `generate.ts` (onboarding
+  planner) · `apply.ts` (idempotent writes) · `types.ts` · `util.ts`
 - `src/engine/` — the findings engine: `finding.ts` (Finding/Lens/ranking) · `ledger.ts`
   (committed improvement memory + `resolveEntry` for dismiss/accept) · `run.ts` (lens registry +
   audit composition)
@@ -78,10 +79,18 @@ over repo-wide scans.
   never introduce a parallel finding shape.
 - `src/lenses/instruction-truth/claims.ts` — claim extraction. Invariant: precision over recall;
   every skip class (builtins, flagged invocations, globs/URLs/placeholders, unrecognized
-  extensions, gitignored claims, installed-binary commands, uninstalled node_modules) is counted
-  and disclosed by the lens, never silently dropped.
+  extensions, gitignored claims, installed-binary commands, uninstalled node_modules,
+  create-this prose, naming stand-ins) is counted and disclosed by the lens, never silently
+  dropped.
 - `src/core/facts.ts` — cache (`.etymd/cache/`, gitignored) vs baseline
   (`.etymd/baseline.json`, committed). Drift is measured against the baseline, never the cache.
+- `src/core/config.ts` — the optional committed config file under `.etymd/` (audit scope +
+  context budgets; etymd itself needs neither, so the file is absent here). Invariant: scoping
+  must never buy silence. Every file dropped by
+  `instructions.exclude` is counted and NAMED in the lens disclosures, and malformed config is
+  disclosed instead of silently falling back — a narrowed audit that looked clean would be the
+  exact dishonesty this tool exists to catch. Reading config is the engine's job (`run.ts` loads
+  it into `LensContext`); a lens never reads the file itself.
 - `src/core/detect.ts` `ROLE_LADDERS` — command classification. Invariant: specific beats meta
   (`test:unit` over a chaining `test`), and a writing command (`--write`/`--fix`/codegen) must
   never be classified where a check belongs (`isSafeGateCommand` guards the hook generator too).
