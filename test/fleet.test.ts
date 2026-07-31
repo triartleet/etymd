@@ -8,6 +8,7 @@ import { promisify } from "node:util"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { loadFleetManifest } from "../src/core/fleet.js"
+import { parseFailOnTier } from "../src/engine/finding.js"
 import { sweep as sweepCmd, dismiss as fleetDismiss } from "../src/commands/fleet.js"
 import {
   checkManifest,
@@ -168,6 +169,40 @@ describe("fleet loader — the registry shape", () => {
     )
   })
 
+  it("PINNED: rejects a name that is not a single path-safe segment — a ../ name must never steer a write", async () => {
+    // Names build finding ids and corp/<name>/ persistence paths; a traversal name aimed a
+    // corp ledger write outside the corp zone before this guard existed.
+    const manifestPath = await writeHub([
+      corp("../evil-zone"),
+      personal("has space"),
+      personal(".hidden"),
+      personal("colon:name"),
+      personal("fine-name"),
+    ])
+    const manifest = await manifestAt(manifestPath)
+    expect(manifest.entries.map((e) => e.name)).toEqual(["fine-name"])
+    const details = manifest.problems.map((p) => p.detail).join("\n")
+    expect(details).toContain('"../evil-zone"')
+    expect(details).toContain("path-safe segment")
+    // Belt-and-braces: even with a hostile name injected past the loader, the persistence
+    // root refuses to resolve outside <manifestDir>/corp/.
+    expect(() => corpPersistenceRoot(manifest, "../evil-zone")).toThrow(/escapes the corp/)
+    expect(() => corpPersistenceRoot(manifest, "a/b")).toThrow(/escapes the corp/)
+  })
+
+  it("drops a non-string contract value as a problem instead of crashing the sweep", async () => {
+    await initRepo("alpha")
+    const manifestPath = await writeHub([
+      personal("alpha", { contract: { state: 123, decisions: "DECISIONS.md" } }),
+    ])
+    const manifest = await manifestAt(manifestPath)
+    expect(manifest.problems.some((p) => p.detail.includes("contract.state"))).toBe(true)
+    expect(manifest.entries[0]?.contract).toEqual({ decisions: "DECISIONS.md" })
+    // The sweep must survive the entry and disclose the manifest problem.
+    const result = await sweepFleet(manifest, {})
+    expect(result.problems.some((p) => p.includes("contract.state"))).toBe(true)
+  })
+
   it('machineProfile "personal" resolves corp entries disclosed-absent, not as a problem', async () => {
     const manifestPath = await writeHub([corp("c-one")], {
       local: { machineProfile: "personal" },
@@ -237,7 +272,7 @@ describe("fleet sweep — pinned invariants", () => {
     const etymdDir = path.join(dir, "corp-zz-worktree", ".etymd")
     expect(await fs.readdir(etymdDir)).toEqual(["ledger.json"]) // no cache/ appeared
     expect(await fs.readFile(path.join(etymdDir, "ledger.json"), "utf8")).toBe(before)
-    // And the sweep itself persisted nothing hive-side either (only dismiss/accept do).
+    // And the sweep itself persisted nothing manifest-side either (only dismiss/accept do).
     expect(
       await fs.access(path.join(dir, "hub", "corp")).then(
         () => true,
@@ -257,7 +292,7 @@ describe("fleet sweep — pinned invariants", () => {
       manifest: manifestPath,
       name: "c-one",
       id: "instruction-truth/no-contract",
-      reason: "fixture: contract lives hive-side",
+      reason: "fixture: contract lives beside the manifest",
     })
 
     const persistRoot = corpPersistenceRoot(await manifestAt(manifestPath), "c-one")
@@ -299,6 +334,14 @@ describe("fleet sweep — pinned invariants", () => {
     const { stdout: status } = await pExecFile("git", ["status", "--porcelain"], { cwd: hub })
     const dirty = status.split("\n").filter((l) => l && !l.startsWith("??"))
     expect(dirty).toEqual([])
+    // And the hub gained NOTHING on disk — new untracked (possibly gitignored) paths are
+    // exactly how a hostile manifest name would smuggle a write into the hub repo.
+    expect((await fs.readdir(hub)).sort()).toEqual([
+      ".git",
+      ".gitignore",
+      "registry.json",
+      "registry.local.json",
+    ])
   })
 })
 
@@ -354,6 +397,56 @@ describe("fleet sweep — honesty and clocks", () => {
     expect(
       result.projects[0]?.findings.some((f) => f.id.startsWith("state-freshness/stale-state")),
     ).toBe(true)
+  })
+
+  it("a configured-but-never-fetched upstream remote gets the full clock, disclosed truthfully", async () => {
+    // `--not --remotes=<name>` excludes nothing when the remote has zero fetched refs — the
+    // disclosure must name the clock actually applied, not the one that was asked for.
+    await initRepo("alpha", { stateAt: "2026-01-01T10:00:00Z" })
+    await gitIn(path.join(dir, "alpha"), null, [
+      "remote",
+      "add",
+      "origin",
+      "https://zz-fixture-host.example/alpha.git",
+    ])
+    const manifestPath = await writeHub([personal("alpha", { upstream: "origin" })])
+    const result = await sweepFleet(await manifestAt(manifestPath), {})
+    expect(result.projects[0]?.disclosures.some((d) => d.includes("no fetched refs"))).toBe(true)
+    expect(result.projects[0]?.disclosures.some((d) => d.includes("fork-authored"))).toBe(false)
+    expect(
+      result.projects[0]?.findings.some((f) => f.id.startsWith("state-freshness/stale-state")),
+    ).toBe(true)
+  })
+
+  it("a foreign-schema last.fleet.json resets the delta baseline with a disclosure — never a crash", async () => {
+    await initRepo("alpha")
+    const manifestPath = await writeHub([personal("alpha")])
+    await write("hub/last.fleet.json", "{}\n") // valid JSON, wrong shape (e.g. an older tool)
+    const chunks: string[] = []
+    const spy = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((s: string | Uint8Array): boolean => {
+        chunks.push(String(s))
+        return true
+      })
+    try {
+      await sweepCmd({ cwd: path.join(dir, "hub"), manifest: manifestPath, json: true })
+    } finally {
+      spy.mockRestore()
+    }
+    const parsed = JSON.parse(chunks.join("")) as Record<string, unknown>
+    expect(parsed.delta).toBeNull() // baseline reset — reads as a first sweep
+    expect(String(parsed.deltaBaselineNote)).toContain("foreign schema")
+    // The sweep replaced the foreign file with a valid baseline (atomically).
+    const last = JSON.parse(
+      await fs.readFile(path.join(dir, "hub", "last.fleet.json"), "utf8"),
+    ) as Record<string, unknown>
+    expect(last.schema).toBe(FLEET_JSON_SCHEMA)
+  })
+
+  it("rejects an unknown --fail-on tier loudly — a typo must not disarm the gate", () => {
+    expect(() => parseFailOnTier("critical")).toThrow(/risk\|gap\|polish/)
+    expect(parseFailOnTier("risk")).toBe("risk")
   })
 
   it("prints the experimental machine schema under --json", async () => {
@@ -538,6 +631,14 @@ describe("fleet wall findings", () => {
     expect(emailMatchesCorpHosts("a@example", hosts)).toBe(false)
     expect(emailMatchesCorpHosts("a@other.example", hosts)).toBe(false)
     expect(emailMatchesCorpHosts("a@sub.git.zz-fixture-corp.example", hosts)).toBe(true)
+  })
+
+  it("climbs at most one label above the host — a generic parent domain is never a corp identity", () => {
+    // A corp host on a hosted/multi-label domain must not flag every commit from the generic
+    // parent (git.corp.example.com ↛ @example.com).
+    const deep = ["git.corp.zz-generic.example"]
+    expect(emailMatchesCorpHosts("a@corp.zz-generic.example", deep)).toBe(true) // one label up
+    expect(emailMatchesCorpHosts("a@zz-generic.example", deep)).toBe(false) // two labels up
   })
 })
 

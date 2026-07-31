@@ -1,3 +1,4 @@
+import { meetsFailOn, parseFailOnTier } from "../engine/finding.js"
 import { runAudit } from "../engine/run.js"
 import {
   print,
@@ -18,23 +19,20 @@ export interface AuditOptions {
   /** Do not persist the reconciled ledger (read-only report). */
   noLedger?: boolean
   /** Exit non-zero when a finding at (or above) this tier exists — the CI gate. */
-  failOn?: "risk" | "gap" | "polish"
+  failOn?: string
 }
 
-const TIER_RANK = { risk: 0, gap: 1, polish: 2 } as const
-
 export async function run(opts: AuditOptions): Promise<void> {
+  // Validate the gate tier BEFORE the audit runs — a typo must never report success.
+  const failOn = opts.failOn === undefined ? undefined : parseFailOnTier(opts.failOn)
   const result = await runAudit(opts.cwd, {
     kind: opts.truth ? "truth" : undefined,
     lensIds: opts.lens ? [opts.lens] : undefined,
     persistLedger: !opts.noLedger,
   })
 
-  if (opts.failOn) {
-    const threshold = TIER_RANK[opts.failOn]
-    if (result.findings.some((f) => TIER_RANK[f.tier] <= threshold)) {
-      process.exitCode = 1
-    }
+  if (failOn && meetsFailOn(result.findings, failOn)) {
+    process.exitCode = 1
   }
 
   if (opts.json) {

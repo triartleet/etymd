@@ -68,6 +68,21 @@ export interface Lens {
 const TIER_ORDER: Record<FindingTier, number> = { risk: 0, gap: 1, polish: 2 }
 const EFFORT_ORDER: Record<Effort, number> = { S: 0, M: 1, L: 2 }
 
+/**
+ * Validate a `--fail-on` tier at the edge. A typo must fail loudly — an unknown tier silently
+ * comparing as "never" would disable the CI gate while looking armed.
+ */
+export function parseFailOnTier(value: string): FindingTier {
+  if (value === "risk" || value === "gap" || value === "polish") return value
+  throw new Error(`--fail-on must be risk|gap|polish, got \`${value}\``)
+}
+
+/** True when any finding sits at or above the tier — the shared `--fail-on` gate predicate. */
+export function meetsFailOn(findings: Finding[], failOn: FindingTier): boolean {
+  const threshold = TIER_ORDER[failOn]
+  return findings.some((f) => TIER_ORDER[f.tier] <= threshold)
+}
+
 /** Canonical ranking: severity first, then cheapest wins inside a tier. */
 export function rankFindings(findings: Finding[]): Finding[] {
   return [...findings].sort(

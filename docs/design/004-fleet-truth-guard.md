@@ -140,7 +140,7 @@ Every shipped fleet default, field, finding, and doc must pass all five (review-
    per-repo gates, zero new ritual).
 2. Manifest loader + `fleet` / `fleet check` / `fleet dismiss|accept` + wall findings — 0.2.0,
    this document.
-3. Sidecar `contractDir` audits: a hive-side contract's claims verified against the corp repo
+3. Sidecar `contractDir` audits: a manifest-side contract's claims verified against the corp repo
    root it describes.
 4. Deferred, evidence-gated (see ROADMAP): `fleet serve` (MCP access layer), `fleet init`
    scaffolding (not before three measured hand-scaffold events), the standalone convention spec.

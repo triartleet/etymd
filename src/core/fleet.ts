@@ -86,6 +86,29 @@ export function expandTilde(p: string): string {
 const REBUILD_RECIPE =
   'rebuild it beside the manifest: {"machineProfile":"corp","dirs":{"<name>":"~/path/to/worktree"}}'
 
+/**
+ * A name must be ONE path-safe segment: names build finding ids (`fleet-manifest/<class>:<name>`)
+ * and filesystem paths (`corp/<name>/.etymd/`, corpus sibling resolution). A `../` name would
+ * steer a ledger write outside the corp zone — the manifest can lie, and a lie must never steer
+ * a write. No separators, no leading dot, no whitespace, no `:` (the id delimiter).
+ */
+const SAFE_NAME = /^[^\s/\\:.][^\s/\\:]*$/
+
+function rejectUnsafeName(
+  name: string,
+  where: string,
+  manifest: FleetManifest,
+  manifestFile: string,
+): boolean {
+  if (SAFE_NAME.test(name)) return false
+  manifest.problems.push({
+    kind: "bad-shape",
+    file: manifestFile,
+    detail: `${where} name ${JSON.stringify(name)} is not a single path-safe segment — entry skipped (names build finding ids and corp/<name>/ persistence paths)`,
+  })
+  return true
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -148,6 +171,7 @@ function loadRegistryEntries(
       })
       continue
     }
+    if (rejectUnsafeName(name, `projects[${i}]`, manifest, manifestFile)) continue
     const profile: FleetProfile = rec.profile === "corp" ? "corp" : "personal"
     if (rec.profile !== undefined && rec.profile !== "corp" && rec.profile !== "personal") {
       manifest.problems.push({
@@ -155,6 +179,22 @@ function loadRegistryEntries(
         file: manifestFile,
         detail: `\`${name}\` declares unknown profile \`${String(rec.profile)}\` — read as personal`,
       })
+    }
+    // Contract values are used as relative paths by consumers — a non-string value must be
+    // dropped AS A PROBLEM, never carried as a live grenade for the sweep to step on.
+    const contract: FleetContract = {}
+    const contractRec = asRecord(rec.contract)
+    if (contractRec) {
+      for (const [k, v] of Object.entries(contractRec)) {
+        if (typeof v === "string") (contract as Record<string, string>)[k] = v
+        else {
+          manifest.problems.push({
+            kind: "bad-shape",
+            file: manifestFile,
+            detail: `\`${name}\`.contract.${k} is not a string — ignored`,
+          })
+        }
+      }
     }
     const entry: FleetEntry = {
       name,
@@ -166,7 +206,7 @@ function loadRegistryEntries(
       trust: asString(rec.trust),
       staleAfterDays: typeof rec.staleAfterDays === "number" ? rec.staleAfterDays : undefined,
       stateBudget: typeof rec.stateBudget === "number" ? rec.stateBudget : undefined,
-      contract: (asRecord(rec.contract) as FleetContract | null) ?? {},
+      contract,
       links: asStringMap(rec.links),
     }
 
@@ -220,6 +260,7 @@ function loadCorpusEntries(
       })
       continue
     }
+    if (rejectUnsafeName(name, `sources[${i}]`, manifest, manifestFile)) continue
     const entry: FleetEntry = {
       name,
       kind: asString(rec.shape),

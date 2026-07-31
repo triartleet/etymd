@@ -56,6 +56,11 @@ export interface ArtifactFreshness {
   lastCommit: string
   /** True when the repo has commits newer than the artifact's last commit. */
   commitsSince: boolean
+  /**
+   * True when the working tree carries uncommitted changes to this artifact — the refresh is
+   * on disk, not yet committed. Treated fresh-now and disclosed, never flagged stale.
+   */
+  dirty?: boolean
 }
 
 /**

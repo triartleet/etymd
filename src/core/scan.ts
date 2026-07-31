@@ -73,6 +73,14 @@ async function collectFreshness(
     return allUnverifiable("repository has no commits yet")
   }
 
+  // A tracked artifact edited SINCE its last commit was just refreshed — the new content is on
+  // disk, uncommitted. It must read fresh-now (disclosed by the lens), or the tool punishes the
+  // exact moment the doc was brought current. `git diff --name-only HEAD` is the porcelain fact
+  // reduced to tracked paths; untracked artifacts already land in `unverifiable`.
+  const dirtyRaw = await git(abs, ["diff", "--name-only", "HEAD"])
+  const dirtyPaths = dirtyRaw ? dirtyRaw.split("\n").filter(Boolean) : []
+  const isDirty = (p: string) => dirtyPaths.some((d) => d === p || d.startsWith(`${p}/`))
+
   const facts: FreshnessFacts = { repoLastCommit, artifacts: [], unverifiable: [] }
   await Promise.all(
     dated.map(async (a) => {
@@ -86,6 +94,7 @@ async function collectFreshness(
         path: a.path,
         lastCommit,
         commitsSince: Date.parse(repoLastCommit) > Date.parse(lastCommit),
+        ...(isDirty(a.path) ? { dirty: true } : {}),
       })
     }),
   )

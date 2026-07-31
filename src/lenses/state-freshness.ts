@@ -37,9 +37,12 @@ function parseDecisionEntries(text: string): DecisionEntry[] {
   return entries
 }
 
-/** Format checks on one marker-carrying decisions file (Scope presence, id sequence, Revisit). */
-function checkDecisionEntries(file: string, text: string, today: string): Finding[] {
-  const entries = parseDecisionEntries(text)
+/**
+ * Id-sequence checks (duplicate ids, append order) on any file using `## D-NNN` headings.
+ * Deliberately NOT marker-gated: an append race is a defect in the file's own chosen
+ * convention, not a format opinion — self-healing must reach legacy files too.
+ */
+function checkIdSequence(file: string, entries: DecisionEntry[]): Finding[] {
   const findings: Finding[] = []
   const nextFree = Math.max(0, ...entries.map((e) => e.num)) + 1
 
@@ -79,7 +82,14 @@ function checkDecisionEntries(file: string, text: string, today: string): Findin
       }
       prev = entry
     }
+  }
+  return findings
+}
 
+/** Format-field checks (Scope presence, Revisit) — marker-gated, forward-only by design. */
+function checkFormatFields(file: string, entries: DecisionEntry[], today: string): Finding[] {
+  const findings: Finding[] = []
+  for (const entry of entries) {
     if (!/Scope[\s*]*:/.test(entry.block)) {
       findings.push({
         id: `${LENS_ID}/scope-missing:${file}:${entry.id}`,
@@ -147,6 +157,14 @@ export const stateFreshnessLens: Lens = {
       for (const a of stateArtifacts) {
         const fact = freshness.artifacts.find((f) => f.artifactId === a.id)
         if (!fact || !freshness.repoLastCommit) continue // absence disclosed above
+        if (fact.dirty) {
+          // The refresh is on disk, uncommitted — flagging it stale would punish the exact
+          // moment the doc was just brought current (e.g. an audit in a pre-commit gate).
+          disclosures.push(
+            `${a.path} has uncommitted changes — modified since its last commit; treated fresh-now, not flagged.`,
+          )
+          continue
+        }
         if (!fact.commitsSince) continue // dormant repo: old state is current state
         const gapDays = Math.floor(
           (Date.parse(freshness.repoLastCommit) - Date.parse(fact.lastCommit)) / MS_PER_DAY,
@@ -195,7 +213,7 @@ export const stateFreshnessLens: Lens = {
       }
     }
 
-    // ---- decisions format checks (marker-gated, forward-only) ----
+    // ---- decisions checks: id sequence always; format fields marker-gated, forward-only ----
     for (const a of decisionArtifacts) {
       const text = await readText(path.join(ctx.root, a.path))
       if (text === null) {
@@ -205,14 +223,16 @@ export const stateFreshnessLens: Lens = {
         )
         continue
       }
+      const entries = parseDecisionEntries(text)
+      findings.push(...checkIdSequence(a.path, entries))
       if (!text.includes(DECISIONS_FORMAT_MARKER)) {
         disclosures.push(
-          `${a.path} carries no \`${DECISIONS_FORMAT_MARKER}\` marker — format checks skipped (forward-only, never retroactive).`,
+          `${a.path} carries no \`${DECISIONS_FORMAT_MARKER}\` marker — format checks skipped (forward-only, never retroactive); id-sequence checks still ran.`,
         )
         outOfScope.push(a.path)
         continue
       }
-      findings.push(...checkDecisionEntries(a.path, text, today))
+      findings.push(...checkFormatFields(a.path, entries, today))
     }
 
     disclosures.push(

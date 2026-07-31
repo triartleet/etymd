@@ -94,11 +94,16 @@ not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.m
 
 - **Fleet follow-ups, evidence-gated** (design record + gates in
   [`docs/design/004-fleet-truth-guard.md`](docs/design/004-fleet-truth-guard.md)): sidecar
-  `contractDir` audits (slice 3 — a hive-side contract's claims verified against the corp repo
+  `contractDir` audits (slice 3 — a manifest-side contract's claims verified against the corp repo
   root it describes); `fleet serve` as the read-only MCP access layer inside this package;
   `fleet init` scaffolding — not before three measured hand-scaffold events (pack v3 rides that
   slice); the standalone convention spec, held behind the dated extraction review. None of these
   is date-gated; each waits for its evidence.
+- **Fleet slice-2 deliberate drops** (recorded, not silent): a `--usage` sweep-telemetry flag was
+  planned and not built — it ships only if a sweep habit shows what is worth counting; the
+  always-loaded context measurement names `PROJECT_CONTEXT.md` literally, so a registry
+  `contract.state` override (e.g. `STATUS.md`) is freshness-checked but does not yet join
+  `measureContext` — join it by artifact kind in slice 3.
 - Loop metrics ingest (pepshop's `scripts/loop-metrics.mjs` output) — measurement of the loop the
   instructions serve.
 - Watch-mode / git-hook integration (`etymd audit --truth` as a pre-push step in guarded repos).

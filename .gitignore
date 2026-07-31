@@ -10,3 +10,5 @@ coverage/
 .etymd/cache/
 # Local-only map from a private corpus entry's public name to its sibling directory.
 sources.local.json
+# Fleet sweep delta baselines are local-only (the README tells manifest repos the same).
+*.fleet.json

@@ -58,6 +58,20 @@ three gap classes: **CI-only** (shift-left — `etymd gates` is the paired fix),
 (coverage collected but no local threshold — server-side Sonar gates are named as living on the
 server; commitlint installed but unwired).
 
+**`state-freshness`** (truth) — the "this describes now" layer (`PROJECT_CONTEXT.md`,
+`DECISIONS.md`, `docs/adr/`, `docs/decisions/`, `NNNN-*.md` under `docs/`), judged by git
+committer dates only, never mtime:
+
+- **Relative staleness**: a state doc is flagged only when the repo moved past it
+  (`staleAfterDays`, default 30; 3x escalates to risk) — a dormant repo's old state is current,
+  and a tracked file with uncommitted edits is treated fresh-now with a disclosure.
+- **Char budget**: state docs over 9,500 chars (session-injection hooks truncate ~10,000).
+  Override both under `state` in `.etymd/config.json`.
+- **Decisions format checks** (`Scope:` presence, past `Revisit:` dates): opt in by adding the
+  literal marker `<!-- decisions-format: 1 -->` anywhere in the decisions file — forward-only,
+  never retroactive. Duplicate / out-of-order `D-NNN` ids are flagged with a rename action even
+  without the marker. Decisions artifacts are exempt from age — old decisions are history.
+
 **`context-economy`** — the always-loaded footprint as findings: any single file ≥ 4000 words,
 total ≥ 8000 words (defaults; override under `context` in `.etymd/config.json`). Only genuinely
 `alwaysApply` Cursor rules count.

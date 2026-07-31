@@ -2,11 +2,12 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 
 import { loadFleetManifest, type FleetManifest } from "../core/fleet.js"
-import { pathExists, readJson } from "../core/util.js"
-import type { Finding, FindingTier } from "../engine/finding.js"
+import { pathExists, readText } from "../core/util.js"
+import { meetsFailOn, parseFailOnTier, type Finding, type FindingTier } from "../engine/finding.js"
 import {
   checkManifest,
   ensureFindingRecorded,
+  fleetLedgerTarget,
   sweepFleet,
   FLEET_JSON_SCHEMA,
   type FleetSweepResult,
@@ -22,8 +23,6 @@ import {
 import { glyph, theme } from "../ui/theme.js"
 import { accept as ledgerAccept, dismiss as ledgerDismiss } from "./ledger.js"
 
-const TIER_RANK: Record<FindingTier, number> = { risk: 0, gap: 1, polish: 2 }
-
 /** The previous sweep, stored beside the manifest for deltas. Local-only — gitignore it. */
 const LAST_SWEEP_FILE = "last.fleet.json"
 
@@ -35,23 +34,69 @@ interface LastSweepRecord {
   wall: { id: string; tier: FindingTier }[]
 }
 
-async function resolveManifestPath(cwd: string, manifest?: string): Promise<string> {
-  if (manifest) return path.resolve(cwd, manifest)
+interface LoadedManifest {
+  manifest: FleetManifest
+  /** Set when the manifest was picked up from the cwd — a targeting fact worth disclosing. */
+  autoNote?: string
+}
+
+async function loadManifest(cwd: string, manifestOpt?: string): Promise<LoadedManifest> {
+  if (manifestOpt) {
+    return { manifest: await loadFleetManifest(path.resolve(cwd, manifestOpt)) }
+  }
   const candidate = path.join(cwd, "registry.json")
-  if (await pathExists(candidate)) return candidate
+  if (await pathExists(candidate)) {
+    // The cwd fallback is a documented convenience, but WHICH manifest got picked is a
+    // targeting fact — disclosed, so a stray registry.json can never be aimed at silently.
+    return {
+      manifest: await loadFleetManifest(candidate),
+      autoNote: `manifest auto-selected from the cwd: ${candidate} (no --manifest given)`,
+    }
+  }
   throw new Error(
     "no --manifest given and no registry.json in the current directory — pass --manifest <file> (there is deliberately no env var and no global pointer)",
   )
 }
 
-async function loadManifest(cwd: string, manifestOpt?: string): Promise<FleetManifest> {
-  return loadFleetManifest(await resolveManifestPath(cwd, manifestOpt))
+/**
+ * Read the delta baseline. Absent is a legitimate first sweep; PRESENT but unreadable or
+ * foreign-schema is disclosed and reset — never a silent crash, never a silent "first sweep".
+ */
+async function readLastSweep(
+  lastPath: string,
+): Promise<{ record: LastSweepRecord | null; note?: string }> {
+  const raw = await readText(lastPath)
+  if (raw === null) return { record: null }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return {
+      record: null,
+      note: `${LAST_SWEEP_FILE} exists but is not valid JSON — delta baseline reset (every finding reads as new this sweep).`,
+    }
+  }
+  const rec = parsed as Partial<LastSweepRecord> | null
+  if (
+    typeof rec !== "object" ||
+    rec === null ||
+    rec.schema !== FLEET_JSON_SCHEMA ||
+    typeof rec.projects !== "object" ||
+    rec.projects === null ||
+    Array.isArray(rec.projects) ||
+    !Array.isArray(rec.wall)
+  ) {
+    return {
+      record: null,
+      note: `${LAST_SWEEP_FILE} carries a foreign schema — delta baseline reset (every finding reads as new this sweep).`,
+    }
+  }
+  return { record: rec as LastSweepRecord }
 }
 
-function failOnExit(failOn: FindingTier | undefined, findings: Finding[]): void {
-  if (!failOn) return
-  const threshold = TIER_RANK[failOn]
-  if (findings.some((f) => TIER_RANK[f.tier] <= threshold)) process.exitCode = 1
+function failOnExit(failOn: string | undefined, findings: Finding[]): void {
+  if (failOn === undefined) return
+  if (meetsFailOn(findings, parseFailOnTier(failOn))) process.exitCode = 1
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -66,14 +111,16 @@ export interface FleetSweepCmdOptions {
   truth?: boolean
   persistLedgers?: boolean
   json?: boolean
-  failOn?: FindingTier
+  failOn?: string
 }
 
 export async function sweep(opts: FleetSweepCmdOptions): Promise<void> {
   if (opts.profile && opts.profile !== "personal" && opts.profile !== "corp") {
     throw new Error(`--profile must be personal or corp, got \`${opts.profile}\``)
   }
-  const manifest = await loadManifest(opts.cwd, opts.manifest)
+  // Validate the gate tier BEFORE the sweep runs — a typo must never report success.
+  if (opts.failOn !== undefined) parseFailOnTier(opts.failOn)
+  const { manifest, autoNote } = await loadManifest(opts.cwd, opts.manifest)
   const result = await sweepFleet(manifest, {
     only: opts.only,
     profile: opts.profile as "personal" | "corp" | undefined,
@@ -82,7 +129,7 @@ export async function sweep(opts: FleetSweepCmdOptions): Promise<void> {
   })
 
   const lastPath = path.join(manifest.dir, LAST_SWEEP_FILE)
-  const previous = await readJson<LastSweepRecord>(lastPath)
+  const { record: previous, note: baselineNote } = await readLastSweep(lastPath)
   const previousIds = (name: string) => new Set((previous?.projects[name] ?? []).map((e) => e.id))
   const previousWallIds = new Set((previous?.wall ?? []).map((e) => e.id))
 
@@ -105,8 +152,20 @@ export async function sweep(opts: FleetSweepCmdOptions): Promise<void> {
   const wallNew = result.wall.filter((f) => !previousWallIds.has(f.id)).map((f) => f.id)
 
   if (opts.json) {
-    print(JSON.stringify({ ...result, delta: previous ? delta : null }, null, 2))
+    print(
+      JSON.stringify(
+        {
+          ...result,
+          delta: previous ? delta : null,
+          ...(baselineNote ? { deltaBaselineNote: baselineNote } : {}),
+        },
+        null,
+        2,
+      ),
+    )
   } else {
+    if (autoNote) print(`  ${theme.dim(`◦ ${autoNote}`)}`)
+    if (baselineNote) print(`  ${theme.dim(`◦ ${baselineNote}`)}`)
     renderSweep(result, previous, delta, wallNew)
   }
 
@@ -119,7 +178,11 @@ export async function sweep(opts: FleetSweepCmdOptions): Promise<void> {
       ),
       wall: result.wall.map((f) => ({ id: f.id, tier: f.tier })),
     }
-    await fs.writeFile(lastPath, JSON.stringify(record, null, 2) + "\n", "utf8")
+    // Write-then-rename: a crash mid-write must leave the old baseline intact, never a
+    // truncated file that silently reads as "first sweep" next time.
+    const tmpPath = `${lastPath}.tmp`
+    await fs.writeFile(tmpPath, JSON.stringify(record, null, 2) + "\n", "utf8")
+    await fs.rename(tmpPath, lastPath)
   } else if (!opts.json) {
     print()
     print(`  ${theme.dim("partial sweep — the delta baseline was not updated")}`)
@@ -193,14 +256,21 @@ export interface FleetCheckCmdOptions {
 }
 
 export async function check(opts: FleetCheckCmdOptions): Promise<void> {
-  const manifest = await loadManifest(opts.cwd, opts.manifest)
+  const { manifest, autoNote } = await loadManifest(opts.cwd, opts.manifest)
   const { findings, disclosures } = await checkManifest(manifest)
   if (findings.length) process.exitCode = 1
 
   if (opts.json) {
-    print(JSON.stringify({ schema: FLEET_JSON_SCHEMA, findings, disclosures }, null, 2))
+    print(
+      JSON.stringify(
+        { schema: FLEET_JSON_SCHEMA, manifest: manifest.manifestPath, findings, disclosures },
+        null,
+        2,
+      ),
+    )
     return
   }
+  if (autoNote) print(`  ${theme.dim(`◦ ${autoNote}`)}`)
   section(
     `Fleet check ${theme.dim(`· ${path.basename(manifest.manifestPath)} · ${manifest.entries.length} entr${manifest.entries.length === 1 ? "y" : "ies"} · manifest truth only, no lenses`)}`,
   )
@@ -227,11 +297,21 @@ async function resolveFleetFinding(
   if (status === "dismissed" && !opts.reason?.trim()) {
     throw new Error('dismiss needs a reason: etymd fleet dismiss <name> <id> --reason "…"')
   }
-  const manifest = await loadManifest(opts.cwd, opts.manifest)
+  const { manifest, autoNote } = await loadManifest(opts.cwd, opts.manifest)
+  if (autoNote) print(`  ${theme.dim(`◦ ${autoNote}`)}`)
+  // The internal persisting audit may create the entry's FIRST ledger (`.etymd/`) — designed
+  // one-command behavior, but a write into a repo that never opted in must be announced.
+  const target = await fleetLedgerTarget(manifest, opts.name)
+  const hadLedger = await pathExists(path.join(target.ledgerRoot, ".etymd"))
   const { ledgerRoot, recorded } = await ensureFindingRecorded(manifest, opts.name, opts.id)
   if (!recorded) {
     throw new Error(
       `no finding \`${opts.id}\` recorded for \`${opts.name}\` even after a fresh audit — check the id against \`etymd fleet\` output (fleet-manifest wall findings are not ledger-quietable)`,
+    )
+  }
+  if (!hadLedger) {
+    print(
+      `  ${theme.dim(`first ledger for \`${opts.name}\`: created ${path.join(ledgerRoot, ".etymd")} (a persisting audit ran to record the finding)`)}`,
     )
   }
   // The single-repo ledger commands do the actual resolution — same logic, different root.

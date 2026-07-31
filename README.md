@@ -78,8 +78,12 @@ is the dominant cost of the loop; a lean contract is a correctness feature.
 **`state-freshness`** — the layer that claims "this describes now" (`PROJECT_CONTEXT.md`,
 `DECISIONS.md`, ADR dirs), judged by git committer dates only, never mtime. Staleness is
 _relative_ — a state doc is stale only when the repo moved past it, so a dormant repo's old
-state is current. Decisions records get format checks (marker-gated) and a `Revisit:` date that,
-once past, becomes a finding.
+state is current; a tracked file with uncommitted edits is treated fresh-now (the refresh is
+already on disk) and disclosed. Decisions records get format checks (`Scope:` presence, a
+`Revisit:` date that, once past, becomes a finding) — opt in by adding the literal marker
+`<!-- decisions-format: 1 -->` anywhere in the file; forward-only, never retroactive. Duplicate
+or out-of-order `D-NNN` ids are flagged with a rename action even without the marker — an
+append race is a defect in the file's own convention, not a format opinion.
 
 **`fleet-manifest`** (via `etymd fleet`) — one truth guard across every repo you registered:
 per-repo audits plus checks on the fleet manifest itself and on the placement wall between

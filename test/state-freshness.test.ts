@@ -71,6 +71,37 @@ describe("state-freshness — relative staleness", () => {
     expect(report.status).toBe("ran")
   })
 
+  it("PINNED: state fresher than the threshold, then a year of dormancy — still zero findings", async () => {
+    // The strongest dormant case: the state trails the last code commit by LESS than the
+    // threshold, and the repo then sleeps for over a year. A wall-clock lens would flag this
+    // (the doc is ~13 months old); the relative clock must not.
+    await gitAt(null, ["init", "-q"])
+    await write("PROJECT_CONTEXT.md", "# state\n\ncurrent work: alpha\n")
+    await commitAll("state", "2025-07-01T10:00:00Z")
+    await write("src/a.ts", "export {}\n")
+    await commitAll("code", "2025-07-15T10:00:00Z") // 14 days later — under the 30-day window
+
+    const report = await stateFreshnessLens.run(await ctx())
+    expect(report.findings).toEqual([])
+  })
+
+  it("treats a tracked state file with uncommitted edits as fresh-now, disclosed", async () => {
+    // The refresh is on disk, not yet committed (e.g. an audit inside a pre-commit gate) —
+    // dating it by its last commit would flag the exact moment it was brought current.
+    await gitAt(null, ["init", "-q"])
+    await write("PROJECT_CONTEXT.md", "# state\n\ncurrent work: alpha\n")
+    await commitAll("state", "2026-01-01T10:00:00Z")
+    await write("src/a.ts", "export {}\n")
+    await commitAll("code much later", "2026-07-01T10:00:00Z") // would be stale-risk
+    await write("PROJECT_CONTEXT.md", "# state\n\njust refreshed, not yet committed\n")
+
+    const report = await stateFreshnessLens.run(await ctx())
+    expect(report.findings).toEqual([])
+    expect(
+      report.disclosures.some((d) => d.includes("PROJECT_CONTEXT.md") && d.includes("uncommitted")),
+    ).toBe(true)
+  })
+
   it("flags state the repo moved past (gap), with committer dates as evidence", async () => {
     await gitAt(null, ["init", "-q"])
     await write("PROJECT_CONTEXT.md", "# state\n\ncurrent work: alpha\n")
@@ -187,6 +218,28 @@ describe("state-freshness — decisions format (marker-gated, forward-only)", ()
     expect(dupe?.tier).toBe("gap")
     expect(dupe?.action).toContain("Rename")
     expect(dupe?.action).toContain("D-003")
+  })
+
+  it("flags duplicate ids even WITHOUT the marker — an append race is not a format opinion", async () => {
+    // Id-sequence checks are deliberately not marker-gated: a duplicated D-NNN in a legacy
+    // file breaks the file's own convention, and self-healing must reach it.
+    await write(
+      "DECISIONS.md",
+      [
+        "# Decisions",
+        "",
+        "## D-001 — 2026-01-05 — first\n\nDecision: keep.",
+        "## D-001 — 2026-01-06 — collided append\n\nDecision: keep.",
+        "",
+      ].join("\n"),
+    )
+    const report = await stateFreshnessLens.run(await ctx())
+    expect(report.findings.map((f) => f.id)).toEqual([
+      "state-freshness/duplicate-id:DECISIONS.md:D-001",
+    ])
+    // Scope-missing did NOT fire (format checks stay marker-gated), and the skip is disclosed.
+    expect(report.disclosures.some((d) => d.includes("id-sequence checks still ran"))).toBe(true)
+    expect(report.outOfScope).toContain("DECISIONS.md")
   })
 
   it("flags a past Revisit date as due review debt; future dates stay quiet", async () => {
