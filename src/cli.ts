@@ -203,14 +203,24 @@ const fleet = program
     }),
   )
 
+// The parent `fleet` command declares --manifest/--json too, and commander binds a flag placed
+// after the subcommand onto the parent when both declare it — so subcommands must read the
+// MERGED options (child wins where both are set) or `fleet check --manifest x` silently loses x.
+interface FleetSharedOpts {
+  manifest?: string
+  json?: boolean
+  reason?: string
+}
+
 fleet
   .command("check")
   .description("Validate the manifest pair only — no lenses: dangling mappings, duplicates, leaks")
   .option("--manifest <file>", "the fleet manifest — required unless the cwd holds registry.json")
   .option("--json", "print the findings as JSON (EXPERIMENTAL through 0.2.x)")
-  .action((opts, cmd) =>
+  .action((_opts, cmd) =>
     action(async () => {
       const { check } = await import("./commands/fleet.js")
+      const opts = cmd.optsWithGlobals() as FleetSharedOpts
       await check({ cwd: resolveCwd(cmd), manifest: opts.manifest, json: opts.json })
     }),
   )
@@ -224,9 +234,10 @@ fleet
   )
   .requiredOption("--reason <text>", "why it is dismissed — recorded so the decision survives")
   .option("--manifest <file>", "the fleet manifest — required unless the cwd holds registry.json")
-  .action((name, id, opts, cmd) =>
+  .action((name, id, _opts, cmd) =>
     action(async () => {
       const { dismiss } = await import("./commands/fleet.js")
+      const opts = cmd.optsWithGlobals() as FleetSharedOpts
       await dismiss({
         cwd: resolveCwd(cmd),
         manifest: opts.manifest,
@@ -246,9 +257,10 @@ fleet
   )
   .option("--reason <text>", "optional note on why the trade-off is accepted")
   .option("--manifest <file>", "the fleet manifest — required unless the cwd holds registry.json")
-  .action((name, id, opts, cmd) =>
+  .action((name, id, _opts, cmd) =>
     action(async () => {
       const { accept } = await import("./commands/fleet.js")
+      const opts = cmd.optsWithGlobals() as FleetSharedOpts
       await accept({ cwd: resolveCwd(cmd), manifest: opts.manifest, name, id, reason: opts.reason })
     }),
   )

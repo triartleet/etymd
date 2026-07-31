@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { existsSync } from "node:fs"
 import { promises as fs } from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -537,5 +538,26 @@ describe("fleet wall findings", () => {
     expect(emailMatchesCorpHosts("a@example", hosts)).toBe(false)
     expect(emailMatchesCorpHosts("a@other.example", hosts)).toBe(false)
     expect(emailMatchesCorpHosts("a@sub.git.zz-fixture-corp.example", hosts)).toBe(true)
+  })
+})
+
+// The built CLI (skipped when dist/ is absent; `npm ci` builds it via `prepare`, so CI has it).
+const CLI = path.resolve(import.meta.dirname, "..", "dist", "cli.js")
+
+describe.skipIf(!existsSync(CLI))("fleet CLI wiring (built binary)", () => {
+  it("binds --manifest and --json placed after a subcommand — the parent/child flag-shadowing regression", async () => {
+    // The parent `fleet` command declares the same flags; commander binds a post-subcommand
+    // flag onto the parent, so the subcommand must read merged options. Run from a cwd WITHOUT
+    // a registry.json: if the binding regresses, check errors out asking for --manifest.
+    await initRepo("alpha")
+    const manifestPath = await writeHub([personal("alpha")])
+    const { stdout } = await pExecFile(
+      "node",
+      [CLI, "fleet", "check", "--json", "--manifest", manifestPath],
+      { cwd: dir },
+    )
+    const parsed = JSON.parse(stdout) as Record<string, unknown>
+    expect(parsed.schema).toBe(FLEET_JSON_SCHEMA)
+    expect(parsed.findings).toEqual([])
   })
 })
