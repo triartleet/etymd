@@ -1,5 +1,8 @@
 # etymd
 
+[![npm version](https://img.shields.io/npm/v/etymd.svg)](https://www.npmjs.com/package/etymd)
+[![CI](https://img.shields.io/github/actions/workflow/status/triartleet/etymd/ci.yml?branch=main&label=CI)](https://github.com/triartleet/etymd/actions/workflows/ci.yml)
+
 **Keep your agent instructions true.**
 
 Your `AGENTS.md` is the interface between your team and every coding agent — and it rots silently.
