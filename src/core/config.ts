@@ -27,9 +27,17 @@ export interface ContextBudgets {
   totalWords: number
 }
 
+export interface StateBudgets {
+  /** Days of commit traffic a state doc may trail the repo by before it counts as stale. */
+  staleAfterDays: number
+  /** Chars in a state doc past which the file is a finding (session hooks truncate ~10k). */
+  maxChars: number
+}
+
 export interface EtymdConfig {
   instructions: InstructionScope
   context: ContextBudgets
+  state: StateBudgets
 }
 
 export interface LoadedConfig {
@@ -43,6 +51,7 @@ export interface LoadedConfig {
 export const DEFAULT_CONFIG: EtymdConfig = {
   instructions: { include: [], exclude: [] },
   context: { perFileWords: 4000, totalWords: 8000 },
+  state: { staleAfterDays: 30, maxChars: 9500 },
 }
 
 export function configPath(root: string): string {
@@ -97,6 +106,7 @@ export async function readConfig(root: string): Promise<LoadedConfig> {
   const obj = parsed as Record<string, unknown>
   const instructions = (obj.instructions ?? {}) as Record<string, unknown>
   const context = (obj.context ?? {}) as Record<string, unknown>
+  const state = (obj.state ?? {}) as Record<string, unknown>
 
   return {
     present: true,
@@ -117,6 +127,13 @@ export async function readConfig(root: string): Promise<LoadedConfig> {
         totalWords:
           readBudget(context.totalWords, "context.totalWords", problems) ??
           DEFAULT_CONFIG.context.totalWords,
+      },
+      state: {
+        staleAfterDays:
+          readBudget(state.staleAfterDays, "state.staleAfterDays", problems) ??
+          DEFAULT_CONFIG.state.staleAfterDays,
+        maxChars:
+          readBudget(state.maxChars, "state.maxChars", problems) ?? DEFAULT_CONFIG.state.maxChars,
       },
     },
   }

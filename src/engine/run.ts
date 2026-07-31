@@ -14,6 +14,7 @@ import type { ProjectFacts } from "../core/types.js"
 import { contextEconomyLens } from "../lenses/context-economy.js"
 import { gateIntegrityLens } from "../lenses/gate-integrity/lens.js"
 import { instructionTruthLens } from "../lenses/instruction-truth/lens.js"
+import { stateFreshnessLens } from "../lenses/state-freshness.js"
 import {
   rankFindings,
   type Finding,
@@ -32,7 +33,12 @@ import {
 } from "./ledger.js"
 
 /** The lens registry — adding a lens means registering it here. */
-export const LENSES: Lens[] = [instructionTruthLens, gateIntegrityLens, contextEconomyLens]
+export const LENSES: Lens[] = [
+  instructionTruthLens,
+  stateFreshnessLens,
+  gateIntegrityLens,
+  contextEconomyLens,
+]
 
 export interface AuditOptions {
   /** Restrict to one kind (doctor = truth). */

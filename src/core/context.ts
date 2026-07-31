@@ -9,6 +9,7 @@ import { approxTokens, pathExists, readText, wordCount } from "./util.js"
 // This is the footprint etymd holds down — context is the dominant cost of the loop.
 const ALWAYS_LOADED: { path: string; role: string }[] = [
   { path: "AGENTS.md", role: "operating contract" },
+  { path: "PROJECT_CONTEXT.md", role: "ground-truth state" },
   { path: "CLAUDE.md", role: "Claude Code pointer" },
   { path: "GEMINI.md", role: "Gemini pointer" },
   { path: ".github/copilot-instructions.md", role: "Copilot instructions" },

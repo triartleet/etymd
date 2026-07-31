@@ -124,6 +124,17 @@ describe("readConfig", () => {
     expect(problems.join(" ")).toContain("instructions.exclude")
     expect(problems.join(" ")).toContain("context.perFileWords")
   })
+
+  it("reads the state key; a malformed member is reported per key, not silently defaulted", async () => {
+    await write(
+      ".etymd/config.json",
+      JSON.stringify({ state: { staleAfterDays: "soon", maxChars: 5000 } }),
+    )
+    const { config, problems } = await readConfig(dir)
+    expect(config.state.staleAfterDays).toBe(DEFAULT_CONFIG.state.staleAfterDays)
+    expect(config.state.maxChars).toBe(5000)
+    expect(problems.join(" ")).toContain("state.staleAfterDays")
+  })
 })
 
 describe("instruction scoping (the fork case)", () => {

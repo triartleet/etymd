@@ -323,7 +323,13 @@ export function packageManagerUsage(text: string): Map<string, number> {
 }
 
 /** Cross-references to other well-known instruction/state docs. */
-export const KNOWN_DOC_REFS = ["AGENTS.md", "CLAUDE.md", "PROJECT_CONTEXT.md", "GEMINI.md"]
+export const KNOWN_DOC_REFS = [
+  "AGENTS.md",
+  "CLAUDE.md",
+  "PROJECT_CONTEXT.md",
+  "DECISIONS.md",
+  "GEMINI.md",
+]
 
 export function extractDocRefs(text: string): string[] {
   return KNOWN_DOC_REFS.filter((name) => text.includes(name))

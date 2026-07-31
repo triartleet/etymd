@@ -40,7 +40,10 @@ program
   .description("Verify every instruction claim against the repo: ranked findings + ledger diff")
   .option("--json", "print the machine-stable audit result as JSON")
   .option("--truth", "truth lenses only (the doctor subset)")
-  .option("--lens <id>", "run a single lens (instruction-truth | gate-integrity | context-economy)")
+  .option(
+    "--lens <id>",
+    "run a single lens (instruction-truth | state-freshness | gate-integrity | context-economy)",
+  )
   .option("--no-ledger", "read-only: do not persist the reconciled ledger")
   .option(
     "--fail-on <tier>",

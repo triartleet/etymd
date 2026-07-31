@@ -61,6 +61,7 @@ over repo-wide scans.
   (committed improvement memory + `resolveEntry` for dismiss/accept) · `run.ts` (lens registry +
   audit composition)
 - `src/lenses/` — the lenses: `instruction-truth/` (claims extraction + the headline truth lens) ·
+  `state-freshness.ts` (state/decisions freshness — git committer dates, never mtime) ·
   `gate-integrity/` (inventory + lens) · `context-economy.ts`
 - `src/pack/` — the versioned pack: `templates.ts` (minimal scaffold + hooks) · `version.ts`
 - `src/ui/` — render + theme (all terminal output goes through here)

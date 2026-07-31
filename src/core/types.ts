@@ -34,8 +34,44 @@ export interface DetectedArtifact {
   label: string
   path: string
   /** What role it plays: the single source of truth, a per-agent pointer, a skill, a gate, etc. */
-  kind: "contract" | "state" | "adapter" | "skill" | "gate" | "map" | "sessions" | "other"
+  kind:
+    | "contract"
+    | "state"
+    | "decisions"
+    | "adapter"
+    | "skill"
+    | "gate"
+    | "map"
+    | "sessions"
+    | "other"
   exists: boolean
+}
+
+/** Committer-date freshness for one state/decisions artifact — a git fact, never mtime. */
+export interface ArtifactFreshness {
+  /** Matches `DetectedArtifact.id`. */
+  artifactId: string
+  path: string
+  /** ISO committer date (`git log -1 --format=%cI`) of the artifact's last commit. */
+  lastCommit: string
+  /** True when the repo has commits newer than the artifact's last commit. */
+  commitsSince: boolean
+}
+
+/**
+ * Freshness of the "this describes now" artifacts (state/decisions), judged from git alone.
+ * mtime is never read — checkouts, syncs, and editors rewrite it freely; the committer date is
+ * the only clock the repo itself vouches for.
+ */
+export interface FreshnessFacts {
+  /** ISO committer date of the repo's last commit. */
+  repoLastCommit?: string
+  artifacts: ArtifactFreshness[]
+  /**
+   * Artifacts whose dates git cannot vouch for (untracked file, shallow clone, not a repo) —
+   * the fact is absent and the lens discloses why; absence is never itself a finding.
+   */
+  unverifiable: { path: string; reason: string }[]
 }
 
 export interface GitFacts {
@@ -83,6 +119,8 @@ export interface ProjectFacts {
   }
   hooks: HookFacts
   artifacts: DetectedArtifact[]
+  /** Optional: baselines approved by older versions predate this fact. */
+  freshness?: FreshnessFacts
   tree: {
     dirs: { name: string; files: number }[]
     /** True when the file count hit the walk cap (large repo). */

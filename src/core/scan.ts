@@ -14,7 +14,7 @@ import {
   walkTree,
   type PackageJson,
 } from "./detect.js"
-import type { ProjectFacts } from "./types.js"
+import type { DetectedArtifact, FreshnessFacts, ProjectFacts } from "./types.js"
 import { git, readJson } from "./util.js"
 
 /** Most-common ticket prefix (e.g. "NGRE2E") in recent commit subjects, if any dominates. */
@@ -33,6 +33,53 @@ function inferTicketKey(subjects: string): string | undefined {
     }
   }
   return bestCount >= 3 ? best : undefined
+}
+
+/**
+ * Committer-date freshness for the "this describes now" artifacts (state/decisions). Always
+ * `git log -1 --format=%cI`, never mtime — checkouts, syncs, and editors rewrite mtime freely,
+ * so the committer date is the only clock the repo itself vouches for. Anything git cannot
+ * vouch for (untracked file, shallow clone, not a repo) lands in `unverifiable` for the lens
+ * to disclose; an absent fact is never itself a finding.
+ */
+async function collectFreshness(
+  abs: string,
+  isRepo: boolean,
+  artifacts: DetectedArtifact[],
+): Promise<FreshnessFacts> {
+  const dated = artifacts.filter((a) => a.exists && (a.kind === "state" || a.kind === "decisions"))
+  const allUnverifiable = (reason: string): FreshnessFacts => ({
+    artifacts: [],
+    unverifiable: dated.map((a) => ({ path: a.path, reason })),
+  })
+
+  if (!isRepo) return allUnverifiable("not a git repository — no committer dates to read")
+  if ((await git(abs, ["rev-parse", "--is-shallow-repository"])) === "true") {
+    return allUnverifiable("shallow clone — history is incomplete, committer dates would lie")
+  }
+  const repoLastCommit = await git(abs, ["log", "-1", "--format=%cI"])
+  if (!repoLastCommit) return allUnverifiable("repository has no commits yet")
+
+  const facts: FreshnessFacts = { repoLastCommit, artifacts: [], unverifiable: [] }
+  await Promise.all(
+    dated.map(async (a) => {
+      const lastCommit = await git(abs, ["log", "-1", "--format=%cI", "--", a.path])
+      if (!lastCommit) {
+        facts.unverifiable.push({ path: a.path, reason: "untracked — never committed" })
+        return
+      }
+      facts.artifacts.push({
+        artifactId: a.id,
+        path: a.path,
+        lastCommit,
+        commitsSince: Date.parse(repoLastCommit) > Date.parse(lastCommit),
+      })
+    }),
+  )
+  // Promise.all completion order is nondeterministic — keep the facts file stable across runs.
+  facts.artifacts.sort((x, y) => x.path.localeCompare(y.path))
+  facts.unverifiable.sort((x, y) => x.path.localeCompare(y.path))
+  return facts
 }
 
 /**
@@ -65,6 +112,7 @@ export async function scanProject(root: string): Promise<ProjectFacts> {
 
   const hooksPath = hooksPathRaw ?? undefined
   const hooks = await detectHooks(abs, hooksPath, rootPkg)
+  const freshness = await collectFreshness(abs, isRepo, artifacts)
   const packages = workspace.packageGlobs.length
     ? await listWorkspacePackages(abs, workspace.packageGlobs)
     : []
@@ -96,6 +144,7 @@ export async function scanProject(root: string): Promise<ProjectFacts> {
     ci,
     hooks,
     artifacts,
+    freshness,
     tree,
   }
 }

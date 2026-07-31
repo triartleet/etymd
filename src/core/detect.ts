@@ -428,6 +428,19 @@ const ARTIFACT_SPECS: Omit<DetectedArtifact, "exists">[] = [
     path: "PROJECT_CONTEXT.md",
     kind: "state",
   },
+  {
+    id: "decisions",
+    label: "DECISIONS.md (decision record)",
+    path: "DECISIONS.md",
+    kind: "decisions",
+  },
+  { id: "adr-dir", label: "ADR directory (docs/adr)", path: "docs/adr", kind: "decisions" },
+  {
+    id: "decisions-dir",
+    label: "ADR directory (docs/decisions)",
+    path: "docs/decisions",
+    kind: "decisions",
+  },
   { id: "claude", label: "CLAUDE.md (Claude Code pointer)", path: "CLAUDE.md", kind: "adapter" },
   {
     id: "copilot",
@@ -474,12 +487,29 @@ const ARTIFACT_SPECS: Omit<DetectedArtifact, "exists">[] = [
 ]
 
 export async function detectArtifacts(root: string): Promise<DetectedArtifact[]> {
-  return Promise.all(
+  const artifacts = await Promise.all(
     ARTIFACT_SPECS.map(async (spec) => ({
       ...spec,
       exists: await pathExists(path.join(root, spec.path)),
     })),
   )
+  // Existing ADR conventions are recognized, never required: NNNN-*.md files directly under
+  // docs/ are a native decision record (the classic ADR naming), same slot as docs/adr/ and
+  // docs/decisions/ — detection, not scaffolding, so no pack change rides on this.
+  let adrFiles = false
+  try {
+    adrFiles = (await fs.readdir(path.join(root, "docs"))).some((f) => /^\d{4}-.+\.md$/.test(f))
+  } catch {
+    /* no docs dir */
+  }
+  artifacts.push({
+    id: "adr-files",
+    label: "ADR files (docs/NNNN-*.md)",
+    path: "docs",
+    kind: "decisions",
+    exists: adrFiles,
+  })
+  return artifacts
 }
 
 /** Top-level directory index with bounded file counts (skips ignored/heavy dirs; caps work). */

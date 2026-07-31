@@ -24,6 +24,7 @@ export {
   type LoadedConfig,
   type InstructionScope,
   type ContextBudgets,
+  type StateBudgets,
 } from "./core/config.js"
 export { runAudit, LENSES, type AuditResult, type AuditOptions } from "./engine/run.js"
 export {
@@ -50,6 +51,7 @@ export {
   type InstructionFileSet,
 } from "./lenses/instruction-truth/claims.js"
 export { contextEconomyLens, TOTAL_BUDGET_WORDS } from "./lenses/context-economy.js"
+export { stateFreshnessLens, DECISIONS_FORMAT_MARKER } from "./lenses/state-freshness.js"
 export {
   buildGateInventory,
   type GateInventory,
@@ -65,6 +67,8 @@ export type {
   ContextFile,
   DiscoveredCommands,
   DetectedArtifact,
+  ArtifactFreshness,
+  FreshnessFacts,
   HookFacts,
   PackageManager,
   WorkspaceKind,
