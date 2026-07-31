@@ -51,15 +51,17 @@ over repo-wide scans.
 
 - `src/cli.ts` — commander wiring; per-command dynamic imports (keep startup thin)
 - `src/commands/` — thin command adapters (audit · init · approve · scan · doctor · context ·
-  brief · gates · ledger[dismiss/accept]); no business logic here
+  brief · gates · ledger[dismiss/accept] · fleet[sweep/check/dismiss/accept]); no business
+  logic here
 - `src/core/` — the deterministic engine: `scan.ts` (orchestrator) · `detect.ts` (detectors +
   classifier ladders + glob expansion) · `facts.ts` (cache vs committed baseline, profile,
   baseline-drift summary for `approve`) · `config.ts` (the optional committed config file under
-  `.etymd/`: instruction scope + context budgets) · `context.ts` · `generate.ts` (onboarding
-  planner) · `apply.ts` (idempotent writes) · `types.ts` · `util.ts`
+  `.etymd/`: instruction scope + context budgets) · `fleet.ts` (the fleet manifest loader —
+  registry + legacy corpus shapes, one resolved model) · `context.ts` · `generate.ts`
+  (onboarding planner) · `apply.ts` (idempotent writes) · `types.ts` · `util.ts`
 - `src/engine/` — the findings engine: `finding.ts` (Finding/Lens/ranking) · `ledger.ts`
   (committed improvement memory + `resolveEntry` for dismiss/accept) · `run.ts` (lens registry +
-  audit composition)
+  audit composition) · `fleet.ts` (sweep + manifest check + fleet-scope wall findings)
 - `src/lenses/` — the lenses: `instruction-truth/` (claims extraction + the headline truth lens) ·
   `state-freshness.ts` (state/decisions freshness — git committer dates, never mtime) ·
   `gate-integrity/` (inventory + lens) · `context-economy.ts`
@@ -68,7 +70,7 @@ over repo-wide scans.
 - `test/` — vitest suites incl. `truth.test.ts` (the lying-fixture) and `corpus.test.ts`
   (read-only sibling-repo smokes)
 - `docs/design/` — the design record (001 founding · 002 foundation re-lock · 003 truth-guard
-  pivot — the current identity)
+  pivot — the current identity · 004 fleet mode)
 - `ROADMAP.md` — now/next/later, the pre-publish checklist, accepted heuristic trade-offs
 
 ## Composition points
@@ -104,6 +106,15 @@ over repo-wide scans.
 - `src/pack/` — every template change is a pack change: bump `PACK_VERSION` when meaning changes;
   nothing outside `pack/` may hardcode template content. The scaffold must never claim what the
   scan cannot know.
+- `src/core/fleet.ts` + `src/engine/fleet.ts` — the fleet seam. The loader resolves BOTH manifest
+  shapes (registry pair, legacy corpus pair) into one model; fleet-scope findings are constructed
+  directly as `Finding`s under lens id `fleet-manifest` — no new Lens abstraction until a second
+  finding family earns it. Invariants, each pinned by test: the sweep never creates `.etymd`
+  anywhere; a corp worktree takes zero writes regardless of flags or a stray `.etymd` inside it
+  (corp persistence root = `<manifestDir>/corp/<name>/.etymd/`); zero corp-resolved content ever
+  lands under the manifest repo's tracked paths; unresolvable entries and skipped checks are
+  disclosed (`outOfScope` / problems), never silently dropped; a filtered sweep never moves the
+  `last.fleet.json` delta baseline (the ledger's partial-run rule, applied to deltas).
 
 ## Conventions
 
@@ -114,7 +125,9 @@ over repo-wide scans.
   reaches a markdown file.
 - kebab-case filenames; commands mirror their CLI name; comment the why, not the what.
 - Every user-visible output path goes through `src/ui/render.ts` — no ad-hoc `console.log`.
-- `--json` outputs are machine-stable schemas; changing them is a breaking change.
+- `--json` outputs are machine-stable schemas; changing them is a breaking change. One declared
+  escape hatch: the fleet `--json` schema and the `registry.json` schema are EXPERIMENTAL through
+  0.2.x — both say so in their own output/docs.
 
 ## Done =
 

@@ -20,6 +20,15 @@ not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.m
 
 ### Shipped since 003
 
+- **Fleet mode, slices 1–2** (2026-07-30/31, design record
+  [`docs/design/004-fleet-truth-guard.md`](docs/design/004-fleet-truth-guard.md)): the
+  `state-freshness` truth lens (git-committer-date staleness, relative — a dormant repo's old
+  state is current; decisions format checks; `Revisit:` debt), then the `fleet` command family —
+  manifest loader for both shapes, `fleet` sweep with per-project delta rendering,
+  `fleet check` manifest validation, `fleet dismiss`/`accept` with corp persistence beside the
+  manifest, and the fleet-scope wall findings. Registry + fleet `--json` schemas are
+  experimental through 0.2.x.
+
 - **Scoped audits + two new skip classes** (2026-07-28), both harvested from the nanoclaw-v2 first
   audit and both proven on it:
 
@@ -83,6 +92,13 @@ not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.m
 
 ## Later (only if the objective still leads)
 
+- **Fleet follow-ups, evidence-gated** (design record + gates in
+  [`docs/design/004-fleet-truth-guard.md`](docs/design/004-fleet-truth-guard.md)): sidecar
+  `contractDir` audits (slice 3 — a hive-side contract's claims verified against the corp repo
+  root it describes); `fleet serve` as the read-only MCP access layer inside this package;
+  `fleet init` scaffolding — not before three measured hand-scaffold events (pack v3 rides that
+  slice); the standalone convention spec, held behind the dated extraction review. None of these
+  is date-gated; each waits for its evidence.
 - Loop metrics ingest (pepshop's `scripts/loop-metrics.mjs` output) — measurement of the loop the
   instructions serve.
 - Watch-mode / git-hook integration (`etymd audit --truth` as a pre-push step in guarded repos).

@@ -94,6 +94,52 @@ the result to account.
 - **`etymd accept <id>`** — acknowledge a finding as accepted reality (e.g. a known trade-off);
   visible in the ledger, out of the report.
 
+## `etymd fleet` — the truth guard across your repositories (EXPERIMENTAL through 0.2.x)
+
+One manifest, `registry.json`, registers every repo you work in (format in the README's
+"fleet manifest" section; design record in `docs/design/004-fleet-truth-guard.md`). The sweep
+runs a read-only audit per resolved entry and checks the manifest itself plus the placement
+wall between personal and corp entries.
+
+```bash
+cd ~/projects/my-fleet-hub            # the dir holding registry.json …
+etymd fleet                            # … or: etymd fleet --manifest path/to/registry.json
+```
+
+The report is one line per project — `name · state-age/staleAfterDays · open counts by tier ·
+Δ vs last sweep` — with detail blocks only for new or risk findings. The delta baseline lives in
+`last.fleet.json` beside the manifest (local-only: gitignore `*.fleet.json`); a filtered sweep
+(`--only`, `--profile`, `--truth`) reports but never moves the baseline.
+
+Flags: `--only <names…>` · `--profile <personal|corp>` · `--truth` · `--persist-ledgers` ·
+`--json` (schema `fleet-experimental-0.2`) · `--fail-on <tier>`. `--manifest` is required unless
+the cwd holds `registry.json` — deliberately no env var and no global pointer.
+
+Walkthrough of the pieces:
+
+- **`etymd fleet check`** — validates the manifest pair only, no lenses, non-zero exit on any
+  finding: parse errors, dangling path/dir mappings (a renamed worktree leaves a ghost entry
+  that looks covered and is swept by nothing — this catches it), duplicate names, a private
+  entry leaking a `path`, dead link targets, absolute `/Users/` paths in the tracked file.
+- **`etymd fleet dismiss <name> <id> --reason "…"` / `etymd fleet accept <name> <id>`** — the
+  one-command loop that keeps a fleet report green AND honest. Personal entries resolve into
+  that repo's `.etymd`; corp entries into `<manifest-dir>/corp/<name>/.etymd/` (created there if
+  missing — the corp worktree is never touched). If the id is not yet recorded, a persisting
+  single-repo audit runs internally first.
+- **Persistence rules** (each pinned by test): the sweep never creates `.etymd` anywhere;
+  `--persist-ledgers` applies only to personal entries that already opted in; corp worktrees
+  take zero writes under every flag combination; and after a sweep, zero corp-resolved content
+  exists under the manifest repo's tracked paths.
+- **Fork freshness**: an entry with `"upstream": "origin"` is dated on fork-authored commits
+  only (`HEAD --not --remotes=origin`) — merged upstream traffic cannot make the fork's state
+  look stale, and a pure mirror reads as dormant. A missing remote falls back to the full clock
+  with a disclosure.
+- **Wall findings** (lens id `fleet-manifest`, all risk-tier): corp contract files inside a corp
+  worktree; unregistered corp-remote checkouts under the fleet root; tracked `/Users/` paths in
+  the manifest's own repo; private needles in `trust: "public-repo"` entries; corp-host commit
+  emails on personal entries. These are not ledger-quietable in 0.2 — the only honest resolution
+  is fixing them. Every check that cannot run says so.
+
 ## CI recipe
 
 ```yaml

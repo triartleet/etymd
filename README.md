@@ -75,21 +75,34 @@ installed but unwired). `allow_failure` jobs count as advisory, never as gates.
 `alwaysApply` Cursor rules count), flagging files worth extracting into on-demand skills. Context
 is the dominant cost of the loop; a lean contract is a correctness feature.
 
+**`state-freshness`** — the layer that claims "this describes now" (`PROJECT_CONTEXT.md`,
+`DECISIONS.md`, ADR dirs), judged by git committer dates only, never mtime. Staleness is
+_relative_ — a state doc is stale only when the repo moved past it, so a dormant repo's old
+state is current. Decisions records get format checks (marker-gated) and a `Revisit:` date that,
+once past, becomes a finding.
+
+**`fleet-manifest`** (via `etymd fleet`) — one truth guard across every repo you registered:
+per-repo audits plus checks on the fleet manifest itself and on the placement wall between
+personal and employer repos. See [the fleet manifest](#the-fleet-manifest-experimental) below.
+
 ## Commands
 
-| Command         | What it does                                                                                                                               |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `etymd audit`   | Verify every claim; ranked findings (risk → gap → polish) + ledger diff. `--lens`, `--truth`, `--json`, `--no-ledger`, `--fail-on <tier>`. |
-| `etymd init`    | Onboard: approve the committed baseline; scaffold a minimal AGENTS.md **only if missing**. Never overwrites.                               |
-| `etymd doctor`  | Alias for `audit --truth`.                                                                                                                 |
-| `etymd context` | The economy view: per-file always-loaded footprint + extraction candidates.                                                                |
-| `etymd gates`   | Install local git-hook gates (pre-commit / pre-push) built from your own check scripts.                                                    |
-| `etymd scan`    | The deterministic reckoning behind everything. `--json`.                                                                                   |
-| `etymd brief`   | A grounded briefing your in-repo agent completes to author the semantic layer.                                                             |
-| `etymd approve` | Refresh the committed baseline non-interactively after intentional structural changes.                                                     |
-| `etymd ledger`  | The findings memory: every tracked finding with status and history.                                                                        |
-| `etymd dismiss` | `dismiss <id> --reason <text>` — a dismissed finding never resurfaces without regressing.                                                  |
-| `etymd accept`  | `accept <id>` — record a finding as accepted reality; visible in the ledger, out of the report.                                            |
+| Command                          | What it does                                                                                                                                                                           |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `etymd audit`                    | Verify every claim; ranked findings (risk → gap → polish) + ledger diff. `--lens`, `--truth`, `--json`, `--no-ledger`, `--fail-on <tier>`.                                             |
+| `etymd init`                     | Onboard: approve the committed baseline; scaffold a minimal AGENTS.md **only if missing**. Never overwrites.                                                                           |
+| `etymd doctor`                   | Alias for `audit --truth`.                                                                                                                                                             |
+| `etymd context`                  | The economy view: per-file always-loaded footprint + extraction candidates.                                                                                                            |
+| `etymd gates`                    | Install local git-hook gates (pre-commit / pre-push) built from your own check scripts.                                                                                                |
+| `etymd scan`                     | The deterministic reckoning behind everything. `--json`.                                                                                                                               |
+| `etymd brief`                    | A grounded briefing your in-repo agent completes to author the semantic layer.                                                                                                         |
+| `etymd approve`                  | Refresh the committed baseline non-interactively after intentional structural changes.                                                                                                 |
+| `etymd ledger`                   | The findings memory: every tracked finding with status and history.                                                                                                                    |
+| `etymd dismiss`                  | `dismiss <id> --reason <text>` — a dismissed finding never resurfaces without regressing.                                                                                              |
+| `etymd accept`                   | `accept <id>` — record a finding as accepted reality; visible in the ledger, out of the report.                                                                                        |
+| `etymd fleet`                    | Sweep every project in a fleet manifest: read-only per-repo audits + manifest/wall checks. `--manifest`, `--only`, `--profile`, `--truth`, `--persist-ledgers`, `--json`, `--fail-on`. |
+| `etymd fleet check`              | Validate the manifest pair alone (no lenses): dangling mappings, duplicate names, privacy leaks, machine paths. Non-zero exit on any finding.                                          |
+| `etymd fleet dismiss` / `accept` | `<name> <id>` — resolve a project's finding from any cwd; corp findings persist beside the manifest, never in the corp worktree.                                                       |
 
 `--cwd <dir>` targets another directory. Read-only probing of any repo leaves **zero trace**
 (`audit --no-ledger` writes nothing).
@@ -133,6 +146,81 @@ Narrowing an audit can hide findings, so etymd never lets it happen quietly: **e
 is counted and named in the lens disclosures**, and a config that fails to parse is reported as a
 disclosure rather than silently falling back to defaults.
 
+## The fleet manifest (EXPERIMENTAL)
+
+`etymd fleet` extends the one objective across every repository you work in — your fleet of
+**repositories**, not a fleet of agents. The manifest, `registry.json`, is itself an
+agent-context file: claims about your fleet (what exists, where, under which profile). It rots
+like any AGENTS.md does, and `etymd fleet` keeps it true. Design record:
+[`docs/design/004-fleet-truth-guard.md`](docs/design/004-fleet-truth-guard.md). Both the
+registry schema and the fleet `--json` schema are **experimental through 0.2.x**.
+
+Two files beside each other — the split is the privacy model:
+
+`registry.json` (tracked; safe to publish by construction):
+
+```jsonc
+{
+  "registryVersion": 1,
+  "root": "~/projects", // ~ expands on the consumer side — never a machine home
+  "projects": [
+    { "name": "web-app", "kind": "repo", "profile": "personal", "path": "web-app" },
+    {
+      "name": "notes",
+      "kind": "docs",
+      "profile": "personal",
+      "path": "notes",
+      "staleAfterDays": 45, // per-entry freshness window
+      "contract": { "state": "STATUS.md" }, // native conventions register, never migrate
+    },
+    {
+      "name": "my-fork",
+      "kind": "tool",
+      "profile": "personal",
+      "path": "my-fork",
+      "upstream": "origin", // freshness measured on fork-authored commits only
+      "trust": "public-repo", // hygiene needles apply (see below)
+    },
+    // Corp entries: opaque alias, private, NO path — real dirs live only in the local file.
+    { "name": "c-one", "kind": "repo", "profile": "corp", "private": true, "staleAfterDays": 45 },
+  ],
+}
+```
+
+`registry.local.json` (gitignored; this machine's facts — each one an identifier you don't ship):
+
+```jsonc
+{
+  "machineProfile": "corp", // "personal" resolves corp entries disclosed-absent
+  "root": "~/projects", // optional per-machine root override
+  "dirs": { "c-one": "~/projects/real-corp-dir" },
+  "labels": { "c-one": "real-corp-dir" },
+  "corpHosts": ["git.example-corp.com"],
+}
+```
+
+How the sweep behaves:
+
+- **Read-only by default, everywhere.** The sweep never creates `.etymd` anywhere.
+  `--persist-ledgers` persists only into personal repos that already opted in, and a **corp
+  worktree is never written** — regardless of flags, even if a stray `.etymd` exists inside it
+  (pinned by test). Corp findings stay dismissible: their ledger lives at
+  `<manifest-dir>/corp/<name>/.etymd/`, beside the manifest.
+- **Deltas.** Each sweep compares against `last.fleet.json` stored beside the manifest and
+  renders `Δ +new −resolved` per project. Add `*.fleet.json` to the manifest repo's
+  `.gitignore` — sweep output is local-only and never tracked.
+- **Wall checks.** Corp contract files found inside a corp worktree, unregistered checkouts
+  under the fleet root whose remotes match `corpHosts`, tracked `/Users/` paths in the manifest
+  repo, private needles (labels, dir names, hosts) inside `trust: "public-repo"` entries, and
+  corp-host commit emails on personal entries — each a risk finding; each check that cannot run
+  is disclosed.
+- **No global pointer.** `--manifest` is required unless the cwd holds `registry.json` — there
+  is deliberately no env var and no home-directory pointer.
+
+Interop note: if a repo's Prettier (or similar formatter) checks JSON, add `.etymd` to its
+`.prettierignore` — etymd writes its own JSON style, and a format gate fighting the ledger is
+noise (this repo does exactly that).
+
 ## Programmatic use
 
 ```ts
@@ -164,7 +252,8 @@ Without it — on a fresh clone or in CI — those suites skip cleanly and the r
 ## Design record & roadmap
 
 [`docs/design/`](docs/design/) — 001 founding · 002 foundation re-lock · **003 the truth-guard
-pivot** (the current identity; includes the state-of-the-field investigation it rests on).
+pivot** (the current identity; includes the state-of-the-field investigation it rests on) ·
+**004 fleet mode** (the truth guard across your repositories).
 [`ROADMAP.md`](ROADMAP.md) — what's now / next / later, the pre-publish checklist, and the
 accepted heuristic trade-offs.
 
