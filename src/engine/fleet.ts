@@ -116,9 +116,14 @@ export function stateBudgetsFor(entry: FleetEntry): Partial<StateBudgets> | unde
  * must be disclosed; `[]` = ran clean. Exit code 1 (no matches) is success, not failure — the
  * distinction `util.git()` cannot make, which is why this helper exists.
  */
-async function gitGrepFiles(root: string, needle: string): Promise<string[] | null> {
+async function gitGrepFiles(
+  root: string,
+  needle: string,
+  mode: "fixed" | "regex" = "fixed",
+): Promise<string[] | null> {
   try {
-    const { stdout } = await pExecFile("git", ["grep", "-I", "-l", "-F", "-e", needle], {
+    const matchFlag = mode === "regex" ? "-E" : "-F"
+    const { stdout } = await pExecFile("git", ["grep", "-I", "-l", matchFlag, "-e", needle], {
       cwd: root,
       timeout: 8000,
     })
@@ -128,6 +133,15 @@ async function gitGrepFiles(root: string, needle: string): Promise<string[] | nu
     return null
   }
 }
+
+/**
+ * A REAL machine path, not prose about the ban. Requires an actual username segment after
+ * /Users/ that keeps going (a path separator, a closing quote, or end of line) — so the
+ * rule text "`/Users/…` paths are banned" and a bare "/Users/" never fire, while
+ * /Users/<anyone>/projects/x and a JSON-quoted "/Users/<anyone>" do.
+ */
+const MACHINE_PATH_RE = /\/Users\/[A-Za-z0-9._@-]{2,}([/"']|$)/m
+const MACHINE_PATH_GREP = String.raw`/Users/[A-Za-z0-9._@-]{2,}(/|"|'|$)`
 
 async function realpathOr(p: string): Promise<string> {
   try {
@@ -297,7 +311,7 @@ export async function checkManifest(
   const rawManifest = await readText(manifest.manifestPath)
   if (rawManifest === null) {
     disclosures.push(`${manifestFile} could not be re-read for the machine-path check — skipped.`)
-  } else if (rawManifest.includes("/Users/")) {
+  } else if (MACHINE_PATH_RE.test(rawManifest)) {
     findings.push(
       finding(
         `${FLEET_LENS}/registry-machine-path:${manifestFile}`,
@@ -403,7 +417,7 @@ async function checkManifestRepoMachinePaths(
     )
     return
   }
-  const files = await gitGrepFiles(manifest.dir, "/Users/")
+  const files = await gitGrepFiles(manifest.dir, MACHINE_PATH_GREP, "regex")
   if (files === null) {
     disclosures.push(
       "Machine-path check could not run (`git grep` failed) — undetermined, not clean.",

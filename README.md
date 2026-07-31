@@ -48,8 +48,7 @@ npx etymd audit         # verify every instruction claim against the repo
 npx etymd audit --fail-on risk   # the CI gate
 ```
 
-Requires Node ≥ 18.17. **Status: pre-publish** — run from a checkout (`npm run build &&
-node dist/cli.js …`) until the first npm release.
+Requires Node ≥ 18.17. On npm since v0.1.0 — `npx etymd` just works.
 
 ## What it checks
 

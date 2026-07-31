@@ -581,18 +581,25 @@ describe("fleet wall findings", () => {
     expect(withoutHosts.disclosures.some((d) => d.includes("Coverage check skipped"))).toBe(true)
   })
 
-  it("flags a tracked /Users/ path in the manifest's own repo", async () => {
+  it("flags a tracked /Users/ path in the manifest's own repo — but never prose ABOUT the ban", async () => {
     const manifestPath = await writeHub([])
     const hub = path.join(dir, "hub")
     await gitIn(dir, null, ["init", "-q", hub])
     await write("hub/.gitignore", "registry.local.json\n")
     await write("hub/notes.md", "scratch: /Users/someone/projects/x carried a stale path\n")
+    // Rule prose: an ellipsis stand-in and a bare mention must NOT fire — a convention
+    // documenting the machine-path ban would otherwise flag itself forever.
+    await write(
+      "hub/rules.md",
+      "Absolute `/Users/…` paths are banned in tracked files.\nBare /Users/ mentions like this one are prose.\n",
+    )
     await gitIn(hub, null, ["add", "-A"])
     await gitIn(hub, "2026-01-01T10:00:00Z", ["commit", "-q", "--no-verify", "-m", "hub"])
     const { findings } = await collectWallFindings(await manifestAt(manifestPath))
     const hit = findings.find((f) => f.id === "fleet-manifest/machine-path:notes.md")
     expect(hit).toBeDefined()
     expect(hit?.tier).toBe("risk")
+    expect(findings.some((f) => f.id === "fleet-manifest/machine-path:rules.md")).toBe(false)
   })
 
   it("flags a public-repo entry whose tracked files carry a private needle — needle out of id and claim", async () => {
