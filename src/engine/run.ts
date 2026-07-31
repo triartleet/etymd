@@ -7,7 +7,7 @@ import {
   writeCachedFacts,
   type Baseline,
 } from "../core/facts.js"
-import { readConfig, type LoadedConfig } from "../core/config.js"
+import { readConfig, type LoadedConfig, type StateBudgets } from "../core/config.js"
 import { scanProject } from "../core/scan.js"
 import { pathExists } from "../core/util.js"
 import type { ProjectFacts } from "../core/types.js"
@@ -47,6 +47,20 @@ export interface AuditOptions {
   lensIds?: string[]
   /** Persist the reconciled ledger (the default; false = read-only report). */
   persistLedger?: boolean
+  /**
+   * Fleet: the audited root is READ-ONLY — write nothing into it, not even the scan cache
+   * where `.etymd` already exists there. A corp worktree is never written, regardless of flags.
+   */
+  readOnlyRoot?: boolean
+  /**
+   * Fleet: read/write the ledger at this root instead of the audited one. Corp findings persist
+   * under the manifest's `corp/<name>/`, never inside the corp worktree.
+   */
+  ledgerRoot?: string
+  /** Fleet: per-entry state-budget overlay (registry `staleAfterDays` / `stateBudget`). */
+  stateBudgets?: Partial<StateBudgets>
+  /** Fleet: judge repo freshness on fork-authored commits only (see `ScanOptions`). */
+  upstreamRemote?: string
 }
 
 export interface AuditResult {
@@ -62,14 +76,26 @@ export interface AuditResult {
 }
 
 export async function runAudit(root: string, opts: AuditOptions = {}): Promise<AuditResult> {
-  const facts = await scanProject(root)
+  const facts = await scanProject(root, { upstreamRemote: opts.upstreamRemote })
+  const ledgerRoot = opts.ledgerRoot ?? root
   // A read-only audit of a repo that never opted in must leave zero trace — only cache where
-  // .etymd/ already exists or this run is allowed to persist anyway.
-  if ((opts.persistLedger ?? true) || (await pathExists(path.join(root, ETYMD_DIR)))) {
+  // .etymd/ already exists or this run is allowed to persist anyway. A read-only root (a corp
+  // worktree) is never cached into, even where a stray .etymd exists there.
+  if (
+    !opts.readOnlyRoot &&
+    ((opts.persistLedger ?? true) || (await pathExists(path.join(root, ETYMD_DIR))))
+  ) {
     await writeCachedFacts(root, facts)
   }
   const baseline = await readBaseline(root)
-  const config = await readConfig(root)
+  let config = await readConfig(root)
+  if (opts.stateBudgets) {
+    // The fleet manifest's per-entry thresholds overlay the repo's own config for this run.
+    config = {
+      ...config,
+      config: { ...config.config, state: { ...config.config.state, ...opts.stateBudgets } },
+    }
+  }
   const profile = baseline?.profile ?? deriveProfile(facts)
 
   const selected = LENSES.filter(
@@ -96,15 +122,17 @@ export async function runAudit(root: string, opts: AuditOptions = {}): Promise<A
   }
 
   const all = reports.flatMap((r) => r.findings)
-  const previous = await readLedger(root)
+  const previous = await readLedger(ledgerRoot)
   // Files no lens looked at this run must not have their tracked findings closed as fixed.
   const outOfScope = reports.flatMap((r) => r.outOfScope ?? [])
   const { ledger, diff } = reconcileLedger(previous, all, undefined, outOfScope)
   // A partial run (kind/lens filter) must not mark unexamined findings resolved — only persist
   // the reconciliation when every lens ran.
   const fullRun = selected.length === LENSES.length
-  if ((opts.persistLedger ?? true) && fullRun) {
-    await writeLedger(root, ledger)
+  // A read-only root only ever takes ledger writes when they are redirected elsewhere.
+  const ledgerWritable = !opts.readOnlyRoot || ledgerRoot !== root
+  if ((opts.persistLedger ?? true) && fullRun && ledgerWritable) {
+    await writeLedger(ledgerRoot, ledger)
   }
 
   return {

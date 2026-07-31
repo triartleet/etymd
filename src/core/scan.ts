@@ -46,6 +46,7 @@ async function collectFreshness(
   abs: string,
   isRepo: boolean,
   artifacts: DetectedArtifact[],
+  upstreamRemote?: string,
 ): Promise<FreshnessFacts> {
   const dated = artifacts.filter((a) => a.exists && (a.kind === "state" || a.kind === "decisions"))
   const allUnverifiable = (reason: string): FreshnessFacts => ({
@@ -57,8 +58,20 @@ async function collectFreshness(
   if ((await git(abs, ["rev-parse", "--is-shallow-repository"])) === "true") {
     return allUnverifiable("shallow clone — history is incomplete, committer dates would lie")
   }
-  const repoLastCommit = await git(abs, ["log", "-1", "--format=%cI"])
-  if (!repoLastCommit) return allUnverifiable("repository has no commits yet")
+  // A fork's clock is its OWN work: with an upstream remote, the repo's last commit is the last
+  // commit not reachable from that remote — upstream traffic merged in must not make the fork's
+  // state look stale. HEAD is explicit because `--not` alone leaves no positive rev.
+  const repoLastCommit = upstreamRemote
+    ? await git(abs, ["log", "-1", "--format=%cI", "HEAD", "--not", `--remotes=${upstreamRemote}`])
+    : await git(abs, ["log", "-1", "--format=%cI"])
+  if (!repoLastCommit) {
+    if (upstreamRemote) {
+      return allUnverifiable(
+        `no fork-authored commits — every commit is reachable from \`${upstreamRemote}\`, the fork has not moved`,
+      )
+    }
+    return allUnverifiable("repository has no commits yet")
+  }
 
   const facts: FreshnessFacts = { repoLastCommit, artifacts: [], unverifiable: [] }
   await Promise.all(
@@ -82,12 +95,20 @@ async function collectFreshness(
   return facts
 }
 
+export interface ScanOptions {
+  /**
+   * Fleet: measure repo freshness on fork-authored commits only (`HEAD --not --remotes=<name>`).
+   * The caller verifies the remote exists and discloses the fallback when it does not.
+   */
+  upstreamRemote?: string
+}
+
 /**
  * The deterministic half of a reckoning: everything knowable without an LLM. Kept pure of any
  * terminal output so it can back both the CLI and programmatic use, and so it is trivially
  * testable against a fixture directory.
  */
-export async function scanProject(root: string): Promise<ProjectFacts> {
+export async function scanProject(root: string, opts: ScanOptions = {}): Promise<ProjectFacts> {
   const abs = path.resolve(root)
   const rootPkg = await readJson<PackageJson>(path.join(abs, "package.json"))
 
@@ -112,7 +133,7 @@ export async function scanProject(root: string): Promise<ProjectFacts> {
 
   const hooksPath = hooksPathRaw ?? undefined
   const hooks = await detectHooks(abs, hooksPath, rootPkg)
-  const freshness = await collectFreshness(abs, isRepo, artifacts)
+  const freshness = await collectFreshness(abs, isRepo, artifacts, opts.upstreamRemote)
   const packages = workspace.packageGlobs.length
     ? await listWorkspacePackages(abs, workspace.packageGlobs)
     : []

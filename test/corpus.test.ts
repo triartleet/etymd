@@ -1,8 +1,9 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync } from "node:fs"
 import path from "node:path"
 
 import { describe, expect, it } from "vitest"
 
+import { loadFleetManifest } from "../src/core/fleet.js"
 import { scanProject } from "../src/core/scan.js"
 import { buildGateInventory } from "../src/lenses/gate-integrity/inventory.js"
 import { instructionTruthLens } from "../src/lenses/instruction-truth/lens.js"
@@ -13,19 +14,29 @@ import { instructionTruthLens } from "../src/lenses/instruction-truth/lens.js"
 // Private corpus entries are named here by shape (`nx-monorepo`, …), never by directory. The
 // untracked sources.local.json supplies the real sibling directory on a machine that has them;
 // everywhere else the lookup misses and the suite skips, which is the same path as "repo absent".
+// Resolution goes through the promoted fleet loader (`src/core/fleet.ts`) — the same code path
+// `etymd fleet` uses — asserting the promotion changed no corpus behavior.
 const CORPUS_ROOT = path.resolve(import.meta.dirname, "..", "..")
 
-const localDirs: Record<string, string> = (() => {
-  try {
-    const raw = readFileSync(path.join(import.meta.dirname, "..", "sources.local.json"), "utf8")
-    return (JSON.parse(raw) as { dirs?: Record<string, string> }).dirs ?? {}
-  } catch {
-    return {}
-  }
-})()
+const manifest = await loadFleetManifest(path.join(import.meta.dirname, "..", "sources.json"))
 
-const repo = (name: string) => path.join(CORPUS_ROOT, localDirs[name] ?? name)
+const repo = (name: string) =>
+  manifest.entries.find((e) => e.name === name)?.resolvedRoot ?? path.join(CORPUS_ROOT, name)
 const hasRepo = (name: string) => existsSync(repo(name))
+
+describe("corpus manifest — the legacy shape loads through the fleet loader", () => {
+  it("parses sources.json as the corpus shape with every entry resolved to a sibling", () => {
+    expect(manifest.shape).toBe("corpus")
+    expect(manifest.problems).toEqual([])
+    expect(manifest.entries.length).toBeGreaterThanOrEqual(7)
+    for (const entry of manifest.entries) {
+      // Behavior unchanged: every corpus entry resolves under the checkout's parent, whether
+      // via a declared path, a local dir mapping, or the same-named-sibling fallback.
+      expect(entry.resolvedRoot).toBeDefined()
+      expect(path.dirname(entry.resolvedRoot as string)).toBe(CORPUS_ROOT)
+    }
+  })
+})
 
 describe.skipIf(!hasRepo("pepshop"))("corpus: pepshop (control — the gold standard)", () => {
   it("scans as a pnpm workspace with wired tracked githooks", async () => {
