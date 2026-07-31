@@ -166,6 +166,93 @@ program
     }),
   )
 
+const fleet = program
+  .command("fleet")
+  .description(
+    "Sweep every project in a fleet manifest: per-repo audits + manifest-truth wall checks (schemas EXPERIMENTAL through 0.2.x)",
+  )
+  .option(
+    "--manifest <file>",
+    "the fleet manifest (registry.json / legacy sources.json) — required unless the cwd holds registry.json",
+  )
+  .option("--only <names...>", "sweep only these registered names")
+  .option("--profile <profile>", "sweep only entries with this profile (personal|corp)")
+  .option("--truth", "truth lenses only per repo (the doctor subset)")
+  .option(
+    "--persist-ledgers",
+    "persist per-repo ledgers — personal-profile entries that already carry .etymd only; corp worktrees are never written",
+  )
+  .option("--json", "print the machine schema (EXPERIMENTAL through 0.2.x, local-only)")
+  .option(
+    "--fail-on <tier>",
+    "exit non-zero when findings at/above this tier exist (risk|gap|polish)",
+  )
+  .action((opts, cmd) =>
+    action(async () => {
+      const { sweep } = await import("./commands/fleet.js")
+      await sweep({
+        cwd: resolveCwd(cmd),
+        manifest: opts.manifest,
+        only: opts.only,
+        profile: opts.profile,
+        truth: opts.truth,
+        persistLedgers: opts.persistLedgers,
+        json: opts.json,
+        failOn: opts.failOn,
+      })
+    }),
+  )
+
+fleet
+  .command("check")
+  .description("Validate the manifest pair only — no lenses: dangling mappings, duplicates, leaks")
+  .option("--manifest <file>", "the fleet manifest — required unless the cwd holds registry.json")
+  .option("--json", "print the findings as JSON (EXPERIMENTAL through 0.2.x)")
+  .action((opts, cmd) =>
+    action(async () => {
+      const { check } = await import("./commands/fleet.js")
+      await check({ cwd: resolveCwd(cmd), manifest: opts.manifest, json: opts.json })
+    }),
+  )
+
+fleet
+  .command("dismiss")
+  .argument("<name>", "the registered project name")
+  .argument("<finding-id>", "the finding id (from `etymd fleet`) to dismiss")
+  .description(
+    "Dismiss a project's finding from any cwd — corp ledgers persist beside the manifest",
+  )
+  .requiredOption("--reason <text>", "why it is dismissed — recorded so the decision survives")
+  .option("--manifest <file>", "the fleet manifest — required unless the cwd holds registry.json")
+  .action((name, id, opts, cmd) =>
+    action(async () => {
+      const { dismiss } = await import("./commands/fleet.js")
+      await dismiss({
+        cwd: resolveCwd(cmd),
+        manifest: opts.manifest,
+        name,
+        id,
+        reason: opts.reason,
+      })
+    }),
+  )
+
+fleet
+  .command("accept")
+  .argument("<name>", "the registered project name")
+  .argument("<finding-id>", "the finding id (from `etymd fleet`) to accept")
+  .description(
+    "Accept a project's finding as a known trade-off — corp ledgers persist beside the manifest",
+  )
+  .option("--reason <text>", "optional note on why the trade-off is accepted")
+  .option("--manifest <file>", "the fleet manifest — required unless the cwd holds registry.json")
+  .action((name, id, opts, cmd) =>
+    action(async () => {
+      const { accept } = await import("./commands/fleet.js")
+      await accept({ cwd: resolveCwd(cmd), manifest: opts.manifest, name, id, reason: opts.reason })
+    }),
+  )
+
 program
   .command("gates")
   .description("Install the local git-hook gates (process → pre-commit, correctness → pre-push)")

@@ -207,6 +207,53 @@ export function renderLedgerDiff(diff: LedgerDiff): void {
   }
 }
 
+/** One fleet-sweep table row: `name · state-age/staleAfterDays · counts by tier · Δ`. */
+export interface FleetRowView {
+  name: string
+  /** e.g. `12/30d`, or `—` when nothing is datable. */
+  age: string
+  counts: { risk: number; gap: number; polish: number }
+  /** e.g. `Δ +1 −2`, `Δ ±0`, `first sweep`. */
+  delta: string
+  /** When set, the entry was not audited — the note replaces counts, never a silent skip. */
+  note?: string
+}
+
+export function renderFleetRows(rows: FleetRowView[]): void {
+  if (!rows.length) {
+    print(`  ${theme.dim("no entries matched — nothing swept")}`)
+    return
+  }
+  const nameWidth = maxWidth(rows.map((r) => r.name))
+  const ageWidth = maxWidth(rows.map((r) => r.age))
+  const countStr = (c: FleetRowView["counts"]) =>
+    c.risk + c.gap + c.polish === 0
+      ? theme.ok("clean")
+      : [
+          c.risk ? theme.bad(`${c.risk} risk`) : "",
+          c.gap ? theme.warn(`${c.gap} gap`) : "",
+          c.polish ? theme.dim(`${c.polish} polish`) : "",
+        ]
+          .filter(Boolean)
+          .join(theme.dim(" · "))
+  const countsWidth = maxWidth(rows.filter((r) => !r.note).map((r) => countStr(r.counts)))
+  for (const r of rows) {
+    if (r.note) {
+      print(`  ${pad(theme.info(r.name), nameWidth)}  ${glyph.bad} ${theme.dim(r.note)}`)
+      continue
+    }
+    print(
+      `  ${pad(theme.info(r.name), nameWidth)}  ${pad(theme.dim(r.age), ageWidth)}  ${pad(countStr(r.counts), countsWidth)}  ${theme.dim(r.delta)}`,
+    )
+  }
+}
+
+/** Honesty lines (problems bold-red, disclosures dim) shared by the fleet renderers. */
+export function renderFleetNotes(problems: string[], disclosures: string[]): void {
+  for (const p of problems) print(`  ${glyph.bad} ${theme.bad(p)}`)
+  for (const d of disclosures) print(`  ${theme.dim(`◦ ${d}`)}`)
+}
+
 const STATUS_ORDER: LedgerStatus[] = ["regressed", "open", "accepted", "dismissed", "done"]
 
 const STATUS_LABEL: Record<LedgerStatus, (s: string) => string> = {

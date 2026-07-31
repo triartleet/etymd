@@ -28,6 +28,26 @@ export {
 } from "./core/config.js"
 export { runAudit, LENSES, type AuditResult, type AuditOptions } from "./engine/run.js"
 export {
+  loadFleetManifest,
+  expandTilde,
+  type FleetManifest,
+  type FleetEntry,
+  type FleetContract,
+  type FleetProfile,
+  type ManifestProblem,
+} from "./core/fleet.js"
+export {
+  sweepFleet,
+  checkManifest,
+  collectWallFindings,
+  corpPersistenceRoot,
+  FLEET_LENS,
+  FLEET_JSON_SCHEMA,
+  type FleetSweepResult,
+  type FleetSweepOptions,
+  type FleetProjectSweep,
+} from "./engine/fleet.js"
+export {
   rankFindings,
   type Finding,
   type Lens,
