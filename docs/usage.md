@@ -11,11 +11,12 @@ briefing `brief` emits. Probing a repo that never opted in (`audit --no-ledger`)
 
 ## The `.etymd` directory — two lifecycles
 
-| Path                   | Lifecycle                            | Role                                             |
-| ---------------------- | ------------------------------------ | ------------------------------------------------ |
-| `.etymd/cache/`        | **gitignored** (init adds the entry) | transient scan cache, re-derivable               |
-| `.etymd/baseline.json` | **committed**                        | the approved reckoning drift is measured against |
-| `.etymd/ledger.json`   | **committed**                        | the findings memory: statuses, diffs, dismissals |
+| Path                   | Lifecycle                            | Role                                                                              |
+| ---------------------- | ------------------------------------ | --------------------------------------------------------------------------------- |
+| `.etymd/cache/`        | **gitignored** (init adds the entry) | transient scan cache, re-derivable                                                |
+| `.etymd/baseline.json` | **committed**                        | the approved reckoning drift is measured against                                  |
+| `.etymd/ledger.json`   | **committed**                        | the findings memory: statuses, diffs, dismissals                                  |
+| `.etymd/config.json`   | **committed**, optional              | audit scope (include/exclude) + context budgets — see the README's config section |
 
 ## `etymd audit` — the command
 
@@ -58,8 +59,8 @@ three gap classes: **CI-only** (shift-left — `etymd gates` is the paired fix),
 server; commitlint installed but unwired).
 
 **`context-economy`** — the always-loaded footprint as findings: any single file ≥ 4000 words,
-total ≥ 8000 words (defaults; configuration is a later release). Only genuinely `alwaysApply`
-Cursor rules count.
+total ≥ 8000 words (defaults; override under `context` in `.etymd/config.json`). Only genuinely
+`alwaysApply` Cursor rules count.
 
 ## `etymd init` — onboarding
 
@@ -84,6 +85,14 @@ the result to account.
 - **`etymd scan`** — the deterministic reckoning (package manager, workspace, script
   classification, hooks incl. husky v3, CI, instruction artifacts, layout). `--json`.
 - **`etymd brief`** — writes `.etymd/brief.md` (or `--human` for onboarding people).
+- **`etymd approve`** — the non-interactive baseline refresh: re-reckon and restamp
+  `.etymd/baseline.json` after intentional structural changes, without the `init` dialogue.
+- **`etymd ledger`** — print the findings memory: every tracked finding with its status
+  (open / accepted / done / dismissed / regressed) and first/last-seen history.
+- **`etymd dismiss <id> --reason <text>`** — record that a finding is noise or a deliberate
+  choice; it stays out of reports unless it regresses. The reason is kept in the ledger.
+- **`etymd accept <id>`** — acknowledge a finding as accepted reality (e.g. a known trade-off);
+  visible in the ledger, out of the report.
 
 ## CI recipe
 
@@ -92,4 +101,4 @@ the result to account.
 ```
 
 Commit `.etymd/baseline.json` + `.etymd/ledger.json`; keep `.etymd/cache/` ignored. Refresh the
-baseline by re-running `etymd init` after intentional structural changes.
+baseline with `etymd approve` after intentional structural changes.

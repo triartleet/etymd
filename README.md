@@ -86,6 +86,10 @@ is the dominant cost of the loop; a lean contract is a correctness feature.
 | `etymd gates`   | Install local git-hook gates (pre-commit / pre-push) built from your own check scripts.                                                    |
 | `etymd scan`    | The deterministic reckoning behind everything. `--json`.                                                                                   |
 | `etymd brief`   | A grounded briefing your in-repo agent completes to author the semantic layer.                                                             |
+| `etymd approve` | Refresh the committed baseline non-interactively after intentional structural changes.                                                     |
+| `etymd ledger`  | The findings memory: every tracked finding with status and history.                                                                        |
+| `etymd dismiss` | `dismiss <id> --reason <text>` — a dismissed finding never resurfaces without regressing.                                                  |
+| `etymd accept`  | `accept <id>` — record a finding as accepted reality; visible in the ledger, out of the report.                                            |
 
 `--cwd <dir>` targets another directory. Read-only probing of any repo leaves **zero trace**
 (`audit --no-ledger` writes nothing).
