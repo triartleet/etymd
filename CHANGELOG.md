@@ -1,6 +1,8 @@
 # etymd
 
-## 0.0.1 (unreleased)
+## 0.1.0 — 2026-07-31
+
+First public release.
 
 The truth guard for agent instruction files — **keep your agent instructions true**. (Formerly
 prototyped as "clothaid", a broader workflow installer; the pivot and its state-of-the-field
