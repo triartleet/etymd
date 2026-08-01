@@ -56,7 +56,7 @@ describe("expandScriptRefs / matchTools", () => {
 // in the org template) but SONAR_* variables + allow_failure; husky-v3 + lint-staged
 // prettier-only locally; coverage collected but no threshold; commitlint installed but unwired;
 // an org include the tool cannot read; !reference tags that must not break parsing.
-const RMTP_LIKE_CI = `
+const LEGACY_SPA_CI = `
 include:
   - project: "org/pipeline-templates"
     file: "/frontend.yml"
@@ -85,7 +85,7 @@ sonarqube:
     SONAR_SCANNER_PACKAGE_VERSION: 4.2.3
 `
 
-async function writeRmtpLikeFixture() {
+async function writeLegacySpaFixture() {
   await write(
     "package.json",
     JSON.stringify({
@@ -105,12 +105,12 @@ async function writeRmtpLikeFixture() {
   )
   await write("yarn.lock", "")
   await write("jest.config.js", "module.exports = { collectCoverageFrom: ['src/**'] }\n")
-  await write(".gitlab-ci.yml", RMTP_LIKE_CI)
+  await write(".gitlab-ci.yml", LEGACY_SPA_CI)
 }
 
 describe("buildGateInventory (cra-legacy-shaped fixture)", () => {
   it("parses CI with !reference tags, records inherited includes and advisory jobs", async () => {
-    await writeRmtpLikeFixture()
+    await writeLegacySpaFixture()
     const facts = await scanProject(dir)
     const inv = await buildGateInventory(dir, facts)
 
@@ -140,7 +140,7 @@ describe("buildGateInventory (cra-legacy-shaped fixture)", () => {
   })
 
   it("derives the honest findings: CI-only correctness, server-side coverage, unwired commitlint", async () => {
-    await writeRmtpLikeFixture()
+    await writeLegacySpaFixture()
     const facts = await scanProject(dir)
     const inv = await buildGateInventory(dir, facts)
     const findings = deriveGateFindings(inv)
@@ -167,7 +167,7 @@ describe("buildGateInventory (cra-legacy-shaped fixture)", () => {
   })
 
   it("suppresses bypass findings when inherited templates could be running the check", async () => {
-    await writeRmtpLikeFixture()
+    await writeLegacySpaFixture()
     const facts = await scanProject(dir)
     const inv = await buildGateInventory(dir, facts)
     const ids = deriveGateFindings(inv).map((f) => f.id)
