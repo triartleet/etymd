@@ -1,6 +1,6 @@
 # 002 — Foundation re-lock (post multi-agent E2E review)
 
-_Supersedes parts of [v0.0.1-design.md](v0.0.1-design.md) (001). 001 remains the founding record;
+_Supersedes parts of [001-founding.md](001-founding.md). 001 remains the founding record;
 where they disagree, this document wins._
 
 ## Why
