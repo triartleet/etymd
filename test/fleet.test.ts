@@ -318,16 +318,17 @@ describe("fleet sweep — pinned invariants", () => {
     // Control: same repo, no declaration — the finding is real and must appear.
     const control = await writeHub([personal("bare")])
     const loud = await sweepFleet(await manifestAt(control), {})
-    expect(
-      loud.projects[0]?.findings.some((f) => f.id === "instruction-truth/no-contract"),
-    ).toBe(true)
+    expect(loud.projects[0]?.findings.some((f) => f.id === "instruction-truth/no-contract")).toBe(
+      true,
+    )
 
     const declared = await writeHub([personal("bare", { contract: { placement: "none" } })])
     const quiet = await sweepFleet(await manifestAt(declared), {})
     const project = quiet.projects[0]
     expect(project?.findings.some((f) => f.id === "instruction-truth/no-contract")).toBe(false)
     // The tier counts must summarize the filtered list, never the raw audit.
-    const total = (project?.counts.risk ?? 0) + (project?.counts.gap ?? 0) + (project?.counts.polish ?? 0)
+    const total =
+      (project?.counts.risk ?? 0) + (project?.counts.gap ?? 0) + (project?.counts.polish ?? 0)
     expect(total).toBe(project?.findings.length)
     expect(project?.disclosures.some((d) => d.includes("legitimately absent"))).toBe(true)
   })
