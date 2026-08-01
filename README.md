@@ -5,50 +5,107 @@
 
 **Keep your agent instructions true.**
 
-Your `AGENTS.md` is the interface between your team and every coding agent — and it rots silently.
-Scripts get renamed, directories move, rules go stale, and the file keeps instructing agents with
-confidence. etymd continuously **verifies the agent context layer against the actual repo**:
+You wrote rules for your AI months ago. Since then a script got renamed, a folder moved, a habit
+changed — and the AI still trusts every word. The file never complains when it goes stale; it just
+keeps instructing, confidently, and you live with the results.
+
+etymd reads those instruction files and checks every claim in them against your actual project.
+
+One command, run in your project's folder (needs Node ≥ 18.17, nothing else): `npx etymd audit`.
+Here it is on a small demo project whose AGENTS.md still tells the AI to run `npm run start` and
+`npm run lint` and points at a `src/legacy/` folder — none of which exist any more:
 
 ```
-$ etymd audit
+$ npx etymd audit
 
-  RISK   AGENTS.md tells agents to run `pnpm dev` — no such script exists
-         evidence  AGENTS.md: `pnpm dev` · package.json scripts
-         action    Update the instruction to the current script name.
+  RISK   AGENTS.md tells agents to run `start` — no such script exists
+         evidence  AGENTS.md: `npm run start` · package.json scripts (root + workspaces)
+         why       An agent following this instruction runs a command that fails — or silently skips the check it was meant to run.
+         action    Update the instruction to the current script name (or restore the script).
+         effort S · confidence high · instruction-truth · instruction-truth/stale-command:AGENTS.md:start
 
-  GAP    AGENTS.md references `src/legacy/` — it does not exist in the repo
-  GAP    Type checking is enforced only in CI — no local hook runs it
-  GAP    AGENTS.md loads 13,809 words (~18k tokens) into every session
+  ...
 
-  since last audit: 1 new · 3 still open · 1 resolved · 1 REGRESSED
+  GAP    AGENTS.md references `src/legacy` — it does not exist in the repo
+         evidence  AGENTS.md · missing: src/legacy
+         why       Agents navigate by these references; a dead path wastes a lookup and erodes trust in the rest of the file.
+         action    Fix or remove the reference.
+         effort S · confidence medium · instruction-truth · instruction-truth/stale-path:AGENTS.md:src/legacy
+
+  since last audit: 3 still open
 ```
+
+Each entry names something that is no longer true, shows the evidence it found, and suggests the
+smallest fix. And it remembers between runs: a problem you fixed — or looked at and deliberately
+waved off — never nags you twice.
+
+That's the whole deal. It works with zero configuration and never rewrites your files — the
+memory it keeps between runs lives in one small folder of its own (`.etymd/`). Everything below
+the line is reference — read it when you need it.
 
 _From Greek **étymon** — a word's true, original sense (→ etymology) — clipped to **etym.** + the
 **.md** family it guards._
 
+---
+
 ## Why this exists
 
-- Instruction files are now load-bearing: 20+ agents (Claude Code, Codex, Cursor, Copilot,
-  Gemini, …) read `AGENTS.md` natively. A stale claim doesn't error — it silently misleads every
-  session.
-- Linters exist for these files, but they check **a point in time**. Truth is a property **over
-  time**: etymd measures drift against a **committed baseline**, remembers findings in a
-  **ledger** (fixed things stay fixed; a returning problem is named a _regression_, and a finding
-  you dismissed with a reason never resurfaces), and gates CI on it.
+- **Truth is a property over time, not a point in time.** Instruction files are load-bearing now —
+  coding agents (Claude Code, Codex, Cursor, Copilot, Gemini, …) read `AGENTS.md` natively, and a
+  stale claim doesn't error, it silently misleads every session. Linters for these files check a
+  moment; etymd measures _drift_ against a committed _baseline_ and remembers findings in a
+  _ledger_, so fixed things stay fixed and a returning problem is named a _regression_ (all four
+  words defined just below). It runs when you invoke it — or when a hook or CI job you wire up
+  does.
 - **Honesty is structural.** Every report declares what it could NOT see — CI jobs inherited from
-  unreadable org templates, server-side quality-gate thresholds, skipped heuristics. No guess is
-  ever dressed as a fact.
+  unreadable org templates, server-side quality-gate thresholds, heuristics it skipped. No guess
+  is ever dressed as a fact.
+- **Precision over recall.** A false "your file is lying" costs more trust than a missed lie, so
+  the checks filter aggressively — and every class of claim they skip is counted and disclosed,
+  never silently dropped.
+
+## The words etymd uses
+
+| The docs say          | It means                                                                                                                                                                                                             |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **finding**           | One verified problem, ranked **RISK** (an agent acting on this does the wrong thing) → **GAP** (a dead reference or missing safeguard) → **POLISH** (worth tidying). Within a tier, cheapest fix first.              |
+| **claim**             | Anything an instruction file asserts about the project that can be checked: a command it tells agents to run, a path it points at, a rule about tooling.                                                             |
+| **lens**              | One self-contained checker for one kind of truth (are the commands real? is the state doc current?). An audit is all lenses run together.                                                                            |
+| **baseline**          | A snapshot of the repo's checkable facts that you approved and committed. Drift is measured against this — not against whatever yesterday's cache happened to hold.                                                  |
+| **drift**             | The distance between the baseline and the repo today: what existed at approval and is now gone, renamed, or moved.                                                                                                   |
+| **ledger**            | The committed memory of findings — each one's status and history. A finding that was fixed and comes back is a **regression**, and the report names it as one rather than re-introducing it as new.                  |
+| **dismiss vs accept** | Two deliberate ways to close a finding. _Dismiss_ = "not a real problem, here's why" — it never resurfaces unless it regresses. _Accept_ = "true, and we're living with it" — kept in the ledger, out of the report. |
+| **gate**              | A check that can actually fail a change: a git hook, a CI job. A job marked `allow_failure` is advisory, not a gate — a check that cannot fail anything is an opinion.                                               |
+| **disclosure**        | The report's account of what it could not see or refused to guess about. Every report carries one; a clean result with no disclosures would be the exact dishonesty this tool exists to catch.                       |
+| **fleet**             | Your fleet of **repositories** — every repo you registered in one manifest, swept by one command. Not a fleet of AI agents.                                                                                          |
+| **context economy**   | The words your instruction files load into every single session, measured against a budget. Context is a cost you pay per conversation; leaner files are cheaper and better obeyed.                                  |
+
+### Things that surprise first-run users
+
+- **"It missed an obvious stale command."** Without `node_modules` installed, command claims are
+  skipped — and the skip is disclosed in the report. A command might resolve to an installed
+  binary, and etymd would rather say "couldn't check" than accuse an honest file. Install
+  dependencies and run again.
+- **`etymd audit` works without `etymd init`.** You only lose drift-over-time measurement — with
+  no committed baseline, there is nothing to measure drift against. Everything else runs.
+- **`etymd init` never overwrites an existing `AGENTS.md`.** It scaffolds a minimal one only if
+  you have none. The feared overwrite path simply does not exist.
+
+---
 
 ## Quick start
 
 ```bash
 cd your-project
-npx etymd init          # approve the baseline (+ scaffold AGENTS.md only if you have none)
 npx etymd audit         # verify every instruction claim against the repo
+npx etymd init          # opt in to drift: approve the baseline (+ scaffold AGENTS.md only if you have none)
 npx etymd audit --fail-on risk   # the CI gate
 ```
 
-Requires Node ≥ 18.17. On npm since v0.1.0 — `npx etymd` just works.
+`audit` needs no setup — without `init` you get the full findings report and lose only drift
+measured against a committed baseline. `init` is that opt-in, not a prerequisite, and it never
+overwrites an existing `AGENTS.md`. On npm since v0.1.0 — `npx etymd` just works. To wire the
+gate into a pipeline, see [In CI](#in-ci).
 
 ## What it checks
 
@@ -122,6 +179,10 @@ personal and employer repos. See [the fleet manifest](#the-fleet-manifest-experi
 The committed files are written to be publishable: the baseline records `"."` as its scan root, never
 your absolute machine path. Only the gitignored cache keeps the real one.
 
+Formatter interop: if your Prettier (or similar formatter) checks JSON, add `.etymd` to
+`.prettierignore` — etymd writes its own JSON style, and a format gate fighting the ledger is
+noise (this repo does exactly that).
+
 ### `.etymd/config.json` (optional)
 
 Every key is optional; omit the file entirely and the defaults below apply.
@@ -145,16 +206,55 @@ Every key is optional; omit the file entirely and the defaults below apply.
 Globs are repo-relative: `*` within a path segment, `**` across segments, `?` one character. A
 pattern with no wildcard is a **path prefix**, so `.claude/skills` covers everything beneath it.
 
-Narrowing an audit can hide findings, so etymd never lets it happen quietly: **every excluded file
-is counted and named in the lens disclosures**, and a config that fails to parse is reported as a
-disclosure rather than silently falling back to defaults.
+Narrowing an audit can hide findings, so etymd never lets it happen quietly. Honesty is
+structural: **every excluded file is counted and named in the lens disclosures**, and a config
+that fails to parse is reported as a disclosure rather than silently falling back to defaults.
+
+## In CI
+
+The gate is one command:
+
+```bash
+npx etymd audit --no-ledger --fail-on risk
+```
+
+Exit-code contract: without `--fail-on`, `audit` reports and exits 0 no matter what it found.
+With `--fail-on <tier>` (`risk` | `gap` | `polish`) it exits non-zero when any finding at or
+above that tier exists — so `--fail-on risk` blocks on risks only, `--fail-on polish` blocks on
+everything. `--no-ledger` keeps the CI run read-only: the throwaway checkout is never written.
+
+The ledger and baseline are not CI by-products — they are **committed, reviewable state**,
+updated locally and read in CI. A dismissal (with its reason), an accepted finding, a baseline
+refresh after an intentional restructure: each lands in `.etymd/` and shows up in the pull
+request diff like any other change. Keep `.etymd` out of your formatter's reach (see
+[the files etymd keeps](#the-files-etymd-keeps)).
+
+A check that runs only in CI is itself a finding: the failure surfaces after the agent finished.
+`etymd gates` installs the local pre-commit / pre-push mirror built from your own check scripts,
+and the `gate-integrity` lens flags whatever still runs in CI alone.
+
+Modeled on this repo's own workflow (etymd guards its own instructions with etymd — its CI runs
+the same gate against its own freshly built CLI):
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  - uses: actions/setup-node@v4
+    with:
+      node-version: 20
+      cache: npm
+  - run: npm ci
+  - run: npx etymd audit --no-ledger --fail-on risk
+```
 
 ## The fleet manifest (EXPERIMENTAL)
 
 `etymd fleet` extends the one objective across every repository you work in — your fleet of
 **repositories**, not a fleet of agents. The manifest, `registry.json`, is itself an
-agent-context file: claims about your fleet (what exists, where, under which profile). It rots
-like any AGENTS.md does, and `etymd fleet` keeps it true. Design record:
+agent-context file: claims about your fleet (what exists, where, under which **profile** — the
+side of the wall an entry belongs to, `personal` or `corp`; the **wall** is the placement
+boundary between personal and employer content that the sweep polices). It rots like any
+AGENTS.md does, and `etymd fleet` keeps it true. Design record:
 [`docs/design/004-fleet-truth-guard.md`](docs/design/004-fleet-truth-guard.md). Both the
 registry schema and the fleet `--json` schema are **experimental through 0.2.x**.
 
@@ -194,7 +294,7 @@ Two files beside each other — the split is the privacy model:
 
 ```jsonc
 {
-  "machineProfile": "corp", // "personal" resolves corp entries disclosed-absent
+  "machineProfile": "corp", // which profile this machine resolves; "personal" resolves corp entries disclosed-absent
   "root": "~/projects", // optional per-machine root override
   "dirs": { "c-one": "~/projects/real-corp-dir" },
   "labels": { "c-one": "real-corp-dir" },
@@ -212,17 +312,24 @@ How the sweep behaves:
 - **Deltas.** Each sweep compares against `last.fleet.json` stored beside the manifest and
   renders `Δ +new −resolved` per project. Add `*.fleet.json` to the manifest repo's
   `.gitignore` — sweep output is local-only and never tracked.
+- **Recurring classes.** A finding class open in two or more projects renders as its own section
+  of class-fix candidates (worst tier first) — the sweep asking "repo bug or fleet bug?", a
+  fleet-level lesson no per-repo audit can see. The sweep only groups; the class vocabulary is
+  minted by the engine's lenses.
+- **Declared absence is honored.** An entry whose contract declares `"placement": "none"` states
+  that instruction files are legitimately absent in that project — the sweep drops its
+  missing-contract finding instead of re-reporting a decision every run. Absence disclosed on
+  purpose is a state, not a gap.
 - **Wall checks.** Corp contract files found inside a corp worktree, unregistered checkouts
   under the fleet root whose remotes match `corpHosts`, tracked `/Users/` paths in the manifest
-  repo, private needles (labels, dir names, hosts) inside `trust: "public-repo"` entries, and
-  corp-host commit emails on personal entries — each a risk finding; each check that cannot run
-  is disclosed.
+  repo, private **needles** — the identifiers the local file holds (labels, dir names, hosts) —
+  inside `trust: "public-repo"` entries, and corp-host commit emails on personal entries — each
+  a risk finding; each check that cannot run is disclosed.
 - **No global pointer.** `--manifest` is required unless the cwd holds `registry.json` — there
   is deliberately no env var and no home-directory pointer.
 
-Interop note: if a repo's Prettier (or similar formatter) checks JSON, add `.etymd` to its
-`.prettierignore` — etymd writes its own JSON style, and a format gate fighting the ledger is
-noise (this repo does exactly that).
+Formatter interop for the `.etymd` state the sweep resolves: same rule as everywhere — see
+[the files etymd keeps](#the-files-etymd-keeps).
 
 ## Programmatic use
 
