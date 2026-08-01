@@ -18,6 +18,7 @@ import {
   renderFleetNotes,
   renderFleetRows,
   section,
+  TIER_BADGE,
   type FleetRowView,
 } from "../ui/render.js"
 import { glyph, theme } from "../ui/theme.js"
@@ -229,6 +230,18 @@ function renderSweep(
   if (detail.length) {
     section(`New or risk findings ${theme.dim(`(${detail.length})`)}`)
     renderFindings(detail)
+  }
+
+  // The class-fix view: a class open in ≥2 repos is a fleet-level lesson no per-repo
+  // session can see — this section is the machine asking "repo bug or fleet bug?" so
+  // nobody has to remember to.
+  if (result.recurringClasses.length) {
+    section(`Recurring classes ${theme.dim("(open in ≥2 projects — class-fix candidates)")}`)
+    for (const rc of result.recurringClasses) {
+      print(
+        `  ${TIER_BADGE[rc.tier]} ${rc.classId} ${theme.dim(`— ${rc.projects.length}×: ${rc.projects.join(", ")}`)}`,
+      )
+    }
   }
 
   section("Fleet wall")

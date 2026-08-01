@@ -65,7 +65,53 @@ export interface FleetSweepResult {
   outOfScope: string[]
   /** Manifest problems, verbatim — disclosed by every renderer, never defaulted away. */
   problems: string[]
+  /** Defect classes open in ≥2 projects — the class-fix candidates (see recurringClasses()). */
+  recurringClasses: RecurringClass[]
 }
+
+export interface RecurringClass {
+  /** The `<lens>/<class>` id prefix — minted by the engine's lenses, identical across repos. */
+  classId: string
+  tier: FindingTier
+  /** Project names (corp entries by alias) where the class is currently open. */
+  projects: string[]
+}
+
+/**
+ * Group each repo's open findings by their engine-minted class prefix (`<lens>/<class>` —
+ * everything before the first `:` in a finding id) and keep the classes open in TWO OR MORE
+ * projects. This is where a repo-local finding becomes visible as a fleet-level lesson: one
+ * repo's heavy AGENTS.md is that repo's problem; the same class in four repos is a class-fix
+ * candidate the per-repo view structurally cannot see. Wall findings are excluded — they are
+ * fleet-scoped already. The class vocabulary is universal by construction (it ships with the
+ * engine, versioned like any API surface); the sweep only groups, it never mints.
+ */
+export function recurringClasses(projects: FleetProjectSweep[]): RecurringClass[] {
+  const byClass = new Map<string, { tier: FindingTier; projects: Set<string> }>()
+  for (const p of projects) {
+    for (const f of p.findings) {
+      const classId = f.id.split(":")[0] ?? f.id
+      const entry = byClass.get(classId)
+      if (entry) {
+        entry.projects.add(p.name)
+        if (TIER_ORDER.indexOf(f.tier) < TIER_ORDER.indexOf(entry.tier)) entry.tier = f.tier
+      } else {
+        byClass.set(classId, { tier: f.tier, projects: new Set([p.name]) })
+      }
+    }
+  }
+  return [...byClass.entries()]
+    .filter(([, v]) => v.projects.size >= 2)
+    .map(([classId, v]) => ({ classId, tier: v.tier, projects: [...v.projects].sort() }))
+    .sort(
+      (a, b) =>
+        TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier) ||
+        b.projects.length - a.projects.length ||
+        a.classId.localeCompare(b.classId),
+    )
+}
+
+const TIER_ORDER: FindingTier[] = ["risk", "gap", "polish"]
 
 function finding(
   id: string,
@@ -708,6 +754,7 @@ export async function sweepFleet(
     wallDisclosures: wall.disclosures,
     outOfScope: projects.filter((p) => !p.resolvedRoot || p.unresolved).map((p) => p.name),
     problems: manifest.problems.map((p) => `${p.file}: ${p.detail}`),
+    recurringClasses: recurringClasses(projects),
   }
 }
 

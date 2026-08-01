@@ -15,8 +15,10 @@ import {
   collectWallFindings,
   corpPersistenceRoot,
   emailMatchesCorpHosts,
+  recurringClasses,
   sweepFleet,
   FLEET_JSON_SCHEMA,
+  type FleetProjectSweep,
 } from "../src/engine/fleet.js"
 import { readLedger } from "../src/engine/ledger.js"
 
@@ -667,5 +669,56 @@ describe.skipIf(!existsSync(CLI))("fleet CLI wiring (built binary)", () => {
     const parsed = JSON.parse(stdout) as Record<string, unknown>
     expect(parsed.schema).toBe(FLEET_JSON_SCHEMA)
     expect(parsed.findings).toEqual([])
+  })
+})
+
+describe("recurringClasses", () => {
+  const sweep = (name: string, ids: [string, "risk" | "gap" | "polish"][]) =>
+    ({
+      name,
+      profile: "personal" as const,
+      staleAfterDays: 30,
+      stateAgeDays: null,
+      counts: { risk: 0, gap: 0, polish: 0 },
+      findings: ids.map(([id, tier]) => ({
+        id,
+        lens: id.split("/")[0] ?? id,
+        tier,
+        claim: "c",
+        evidence: [],
+        why: "w",
+        effort: "S" as const,
+        confidence: "high" as const,
+      })),
+      disclosures: [],
+    }) satisfies FleetProjectSweep
+
+  it("groups by the engine-minted class prefix and keeps only classes open in ≥2 projects", () => {
+    const rc = recurringClasses([
+      sweep("alpha", [
+        ["context-economy/heavy-file:AGENTS.md", "gap"],
+        ["instruction-truth/stale-path:AGENTS.md:src/x", "gap"],
+      ]),
+      sweep("beta", [["context-economy/heavy-file:AGENTS.md", "gap"]]),
+      sweep("gamma", [
+        ["context-economy/heavy-file:README.md", "risk"],
+        ["gate-integrity/hooks-not-wired", "risk"],
+      ]),
+    ])
+    // heavy-file spans 3 projects (different files — same CLASS); stale-path and
+    // hooks-not-wired are single-project and must not appear.
+    expect(rc).toHaveLength(1)
+    expect(rc[0]?.classId).toBe("context-economy/heavy-file")
+    expect(rc[0]?.projects).toEqual(["alpha", "beta", "gamma"])
+    // The class inherits its worst open tier across the fleet.
+    expect(rc[0]?.tier).toBe("risk")
+  })
+
+  it("a class in one project only is a repo problem, not a fleet lesson — empty result", () => {
+    const rc = recurringClasses([
+      sweep("alpha", [["context-economy/heavy-file:AGENTS.md", "gap"]]),
+      sweep("beta", [["gate-integrity/ci-only-typecheck", "gap"]]),
+    ])
+    expect(rc).toEqual([])
   })
 })

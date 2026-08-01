@@ -150,7 +150,7 @@ export function renderPlan(
   }
 }
 
-const TIER_BADGE: Record<Finding["tier"], string> = {
+export const TIER_BADGE: Record<Finding["tier"], string> = {
   risk: pc.red(pc.bold("RISK  ")),
   gap: pc.yellow(pc.bold("GAP   ")),
   polish: pc.dim(pc.bold("POLISH")),
