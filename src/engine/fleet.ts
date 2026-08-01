@@ -691,7 +691,12 @@ async function sweepEntry(
   })
 
   project.findings = result.findings
-  for (const f of result.findings) project.counts[f.tier] += 1
+  if (entry.contract.placement === "none") {
+    // The repo-local lens can't see the registry's declaration that instruction files are
+    // legitimately absent here — the fleet view honors it, or every sweep re-reports a decision.
+    project.findings = project.findings.filter((f) => !f.id.endsWith("/no-contract"))
+  }
+  for (const f of project.findings) project.counts[f.tier] += 1
   project.stateAgeDays = stateAgeDays(result.facts)
   // The row's denominator must be the threshold the audit ACTUALLY applied — repo config plus
   // the registry overlay — or the summary contradicts the findings it summarizes.
