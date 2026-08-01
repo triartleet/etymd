@@ -44,8 +44,8 @@
       "note": "pre-design repo; covers the no-manifest scaffold class (the see-package.json fix)"
     },
     {
-      "name": "nanoclaw-v2",
-      "path": "../nanoclaw-v2",
+      "name": "wonder-worker",
+      "path": "../wonder-worker",
       "role": "reference",
       "shape": "pnpm + Bun fork of an active upstream OSS assistant",
       "note": "large claim-rich surface: 29KB CLAUDE.md, symlinked+gitignored AGENTS.md, husky; the fork-scoping case"
