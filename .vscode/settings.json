@@ -1,0 +1,18 @@
+{
+  // Markdown validation rules — deliberately PER PROJECT, not in VS Code's user settings, so
+  // corporate repos never inherit them. The global user-settings block owns the preview
+  // cosmetics (stylesheet, font, line height, wrap); the rules that produce warnings live here.
+  //
+  // referenceLinks is OFF. Measured across the whole fleet on 2026-08-03: this one rule produced
+  // 301 of 326 warnings and every single one was ordinary bracketed prose — [CRITICAL], [bot],
+  // [--base <branch>], [repair, inflammation]. Zero true positives anywhere. A rule that only
+  // ever cries wolf trains you to ignore the ones that matter, and it was burying them too:
+  // 8 of wonder-worker's 10 findings sat below its own 60-line output cap.
+  "markdown.validate.referenceLinks.enabled": "ignore",
+
+  // These two stay on — between them they found all 16 real defects in the fleet: links left
+  // behind by a file move, a doubled path prefix, and a fragment pointing at a renumbered
+  // heading. All 16 are now fixed.
+  "markdown.validate.fileLinks.enabled": "warning",
+  "markdown.validate.fragmentLinks.enabled": "warning"
+}
