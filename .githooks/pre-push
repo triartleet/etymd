@@ -14,3 +14,21 @@ if [ -f dist/cli.js ]; then
 else
   echo "› etymd audit skipped (no dist/ — run npm run build)"
 fi
+
+# Markdown links. lychee parses real CommonMark, so bracketed prose is a text node and never
+# a finding — the failure mode that made the previous hand-rolled checker unusable (D-025 in
+# wonder-queen). --include-fragments is MANDATORY and cannot live in lychee.toml: without it
+# fragment checking is silently skipped entirely. Skips with a note if lychee is absent.
+if command -v lychee >/dev/null 2>&1; then
+  echo "› lychee (markdown links)"
+  lychee --include-fragments . || exit 1
+else
+  echo "› lychee skipped (not on PATH — 'brew install lychee')"
+fi
+
+# Case-exactness. macOS APFS is case-insensitive, so [x](Readme.md) pointing at README.md
+# resolves locally and lychee reports it OK — then 404s on GitLab.
+if command -v md-case-guard >/dev/null 2>&1; then
+  echo "› case-exactness guard"
+  md-case-guard || exit 1
+fi

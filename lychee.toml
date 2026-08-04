@@ -1,0 +1,34 @@
+# lychee — markdown link checking. Fleet-wide config; see wonder-queen D-025.
+
+# Local files and fragments only; no network from a git hook. A push must not depend on a
+# third party being reachable, and external link rot is a different problem on a different
+# cadence.
+offline = true
+
+# Markdown only. Without this lychee also walks .html and reports things like a missing
+# favicon as a link error.
+extensions = ["md"]
+
+# ── TWO INVOCATION HAZARDS, both measured on 2026-08-04. Read before changing a command. ──
+#
+# 1. `--include-fragments` CANNOT be set in this file. lychee 0.24.2 rejects the key outright
+#    ("wanted string or table"), so it must be passed on the command line every time. Without
+#    it lychee SILENTLY SKIPS ALL FRAGMENT CHECKING: on a fixture with a link to a heading
+#    that does not exist, bare `lychee .` reports "2 OK, 0 Errors" and the flag turns it into
+#    "1 OK, 1 Error". A bare `lychee .` is therefore false confidence, not a lighter check.
+#
+# 2. Invoke with the DIRECTORY form, `lychee .`. It respects .gitignore. The glob form
+#    `lychee './**/*.md'` does not, and walks node_modules — measured 160 third-party errors
+#    in pepshop that way, against 0 for the directory form.
+
+# ── EXEMPTIONS ──
+# Every entry must name its verdict and its reason:
+#   PROSPECTIVE — a file this project intends to write but has not written yet.
+#   STAND-IN    — a link correct where it is DELIVERED rather than where it is stored
+#                 (a copy-verbatim template).
+#   HISTORICAL  — a link inside an append-only record that pointed at something real when
+#                 it was written. Rot that cannot be repaired without rewriting history.
+# ROT and PATH BUG in live documents are never exempted; they get fixed.
+# `lychee --verbose .` prints each exemption with its source file:line and the reason, so
+# this list can be audited for staleness instead of silently accumulating.
+exclude = []
