@@ -76,8 +76,81 @@ const TOOL_MATCHERS: [GateTool, RegExp][] = [
 ]
 
 /**
- * Expand `yarn x` / `npm run x` / `pnpm x` references into the referenced script bodies (two
- * levels) so a CI line like `yarn test:lint` is matched by what it actually runs.
+ * Package-manager built-ins that are never a script, even when a script of the same name
+ * exists: `npm ci` always means clean-install and a `ci` script cannot shadow it. Excluding
+ * these is semantics, not a heuristic — and it matters, because treating `npm ci` as "runs
+ * the ci script" would attribute that script's tools to a line that only installs deps, i.e.
+ * report a gate as covered when nothing runs it.
+ *
+ * `test`, `start`, `stop` and `restart` are deliberately ABSENT — those really are script
+ * shortcuts (`npm test` runs the `test` script).
+ */
+const PM_SUBCOMMANDS = new Set([
+  "run",
+  "run-script",
+  "install",
+  "i",
+  "ci",
+  "add",
+  "remove",
+  "rm",
+  "uninstall",
+  "un",
+  "update",
+  "up",
+  "upgrade",
+  "create",
+  "init",
+  "audit",
+  "publish",
+  "pack",
+  "link",
+  "unlink",
+  "why",
+  "list",
+  "ls",
+  "outdated",
+  "prune",
+  "dedupe",
+  "import",
+  "rebuild",
+  "root",
+  "config",
+  "cache",
+  "login",
+  "logout",
+  "whoami",
+  "version",
+  "workspace",
+  "workspaces",
+  "store",
+  "fund",
+  "deprecate",
+  "access",
+  "bin",
+  "env",
+  "help",
+])
+
+/** After these, the remaining tokens are a BINARY invocation, never a script name. */
+const PM_BINARY_RUNNERS = new Set(["exec", "dlx", "x"])
+
+/** npx runs binaries — except these, which run scripts by name. */
+const NPX_SCRIPT_RUNNERS = new Set(["run-s", "run-p", "npm-run-all"])
+
+/**
+ * Expand package-manager script references into the referenced script bodies (two levels), so
+ * a CI line like `yarn test:lint` is matched by what it actually runs.
+ *
+ * This does NOT try to guess WHERE the script name sits. It cannot: the position depends on
+ * each manager's own flag grammar, and there are at least five live shapes —
+ *   `pnpm run x` · `pnpm -s x` · `pnpm -r --if-present run x` ·
+ *   `pnpm --filter <pkg> x` · `yarn workspace <pkg> x`
+ * A positional match handled one of them and silently expanded nothing for the rest, so a
+ * hook running `pnpm run typecheck` read as having no typecheck at all.
+ *
+ * Instead it scans the invocation's tokens for a name we KNOW is a script, which needs no
+ * grammar. Unknown tokens simply fail the lookup and cost nothing.
  */
 export function expandScriptRefs(
   command: string,
@@ -86,20 +159,35 @@ export function expandScriptRefs(
 ): string {
   if (depth <= 0) return command
   let expanded = command
-  for (const m of command.matchAll(
-    /(?:yarn|pnpm|npm run|bun run|npx run-s|npx run-p)\s+([A-Za-z0-9:._-]+)/g,
-  )) {
-    const name = m[1] as string
+  const seen = new Set<string>()
+  const add = (name: string): void => {
+    if (seen.has(name)) return
+    seen.add(name)
     const body = scripts[name]
     if (body) expanded += `\n${expandScriptRefs(body, scripts, depth - 1)}`
   }
-  // Bare script-name tokens inside npm-run-all/run-s/run-p invocations.
-  if (/npm-run-all|run-s|run-p/.test(command)) {
-    for (const token of command.split(/\s+/)) {
-      const clean = token.replace(/["']/g, "")
-      const body = scripts[clean]
-      if (body) expanded += `\n${expandScriptRefs(body, scripts, depth - 1)}`
+
+  // One match per invocation; `[^&|;]*` stops at a command separator so `npm ci && pnpm test`
+  // is two invocations rather than one blurred token soup.
+  for (const m of command.matchAll(/\b(yarn|pnpm|npm|bun|npx)\b([^&|;]*)/g)) {
+    const manager = m[1] as string
+    const tokens = (m[2] ?? "")
+      .split(/\s+/)
+      .map((t) => t.replace(/["']/g, ""))
+      .filter(Boolean)
+    // `npx eslint .` runs a binary; TOOL_MATCHERS already sees that directly.
+    if (manager === "npx" && !(tokens[0] && NPX_SCRIPT_RUNNERS.has(tokens[0]))) continue
+    for (const token of tokens) {
+      if (token.startsWith("-")) continue
+      if (PM_BINARY_RUNNERS.has(token)) break
+      if (PM_SUBCOMMANDS.has(token) || NPX_SCRIPT_RUNNERS.has(token)) continue
+      add(token)
     }
+  }
+
+  // npm-run-all/run-s/run-p invoked bare inside a script body, with no manager prefix.
+  if (/npm-run-all|run-s|run-p/.test(command)) {
+    for (const token of command.split(/\s+/)) add(token.replace(/["']/g, ""))
   }
   return expanded
 }

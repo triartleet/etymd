@@ -45,6 +45,60 @@ describe("expandScriptRefs / matchTools", () => {
     expect(() => expandScriptRefs("yarn a", cyclic)).not.toThrow()
   })
 
+  // Every shape below was found live in the owner's own hooks and CI files. The previous
+  // positional regex handled only `npm run x`, `yarn x` and `pnpm x`; the rest expanded to
+  // nothing, so a hook running `pnpm run typecheck` reported as having no typecheck at all.
+  const SCRIPTS = {
+    typecheck: "tsc --noEmit",
+    test: "vitest run",
+    "format:check": 'prettier --check "src/**/*.ts"',
+    build: "tsc",
+    lint: "eslint src/",
+    ci: "vitest run --coverage",
+  }
+
+  it.each([
+    ["pnpm run typecheck", "typecheck"],
+    ["pnpm -s typecheck", "typecheck"],
+    ["pnpm typecheck", "typecheck"],
+    ["npm run typecheck", "typecheck"],
+    ["yarn run typecheck", "typecheck"],
+    ["bun run typecheck", "typecheck"],
+    ["pnpm -r --if-present run typecheck", "typecheck"],
+    ["pnpm --filter @scope/pkg typecheck", "typecheck"],
+    ["yarn workspace @scope/pkg typecheck", "typecheck"],
+  ])("expands %s regardless of where the script name sits", (cmd) => {
+    expect(matchTools(cmd, SCRIPTS)).toContain("typecheck")
+  })
+
+  it("never reads a package-manager built-in as a script", () => {
+    // `npm ci` installs; a `ci` script cannot shadow it. Expanding it would claim a test
+    // gate exists on a line that only installs dependencies.
+    expect(matchTools("npm ci", SCRIPTS)).not.toContain("test")
+    expect(matchTools("pnpm install --frozen-lockfile", SCRIPTS)).not.toContain("test")
+    expect(matchTools("yarn install --frozen-lockfile", SCRIPTS)).not.toContain("test")
+  })
+
+  it("keeps the genuine script shortcuts", () => {
+    expect(matchTools("npm test", SCRIPTS)).toContain("test")
+    expect(matchTools("bun test", SCRIPTS)).toContain("test")
+  })
+
+  it("treats exec/dlx as binary invocations, not script lookups", () => {
+    // `pnpm exec tsc --noEmit` runs a binary; `build` here is a path argument, not the script.
+    expect(matchTools("pnpm exec eslint build", SCRIPTS)).not.toContain("typecheck")
+    expect(matchTools("pnpm exec eslint build", SCRIPTS)).toContain("lint")
+  })
+
+  it("still expands run-s / run-p script lists", () => {
+    expect(matchTools("npx run-s lint typecheck", SCRIPTS)).toContain("typecheck")
+    expect(matchTools("npm-run-all lint typecheck", SCRIPTS)).toContain("typecheck")
+  })
+
+  it("does not treat an npx binary as a script name", () => {
+    expect(matchTools("npx eslint src/", SCRIPTS)).toContain("lint")
+  })
+
   it("distinguishes prettier check from prettier write", () => {
     expect(matchTools("prettier -l 'src/**'", {})).toContain("format-check")
     expect(matchTools("prettier --write src", {})).toContain("format-write")
