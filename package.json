@@ -1,6 +1,6 @@
 {
   "name": "etymd",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Keep your agent instructions true — verify AGENTS.md, CLAUDE.md, rules & skills against the actual repo, with drift caught over time and a regression ledger.",
   "keywords": [
     "cli",
