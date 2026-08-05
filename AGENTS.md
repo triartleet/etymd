@@ -38,6 +38,16 @@ Distilled from the pepshop frontrunner workflow, validated against a sibling-rep
   dress a heuristic as a fact — this is the product's core value and the repo's own rule.
 - **Precision over recall.** A false "your file is lying" costs more trust than a missed lie —
   claim-extraction heuristics filter aggressively and disclose what they skip.
+- **Public repo.** Publishing exposes ALL history, not just the current tree, so no tracked
+  file or commit message may carry: absolute paths, hostnames or other machine and
+  environment detail; employer, client or internal project names and ticket identifiers;
+  identity or credential configuration written into prose (author metadata belongs in
+  `LICENSE` and `package.json`); the names of the developer's other projects; or internal
+  deliberation and provenance. Documentation examples must not name a real private project
+  or a convention the tool does not itself recognize. The test: _would this line make sense,
+  and be safe, read by a stranger who knows nothing about the developer or their other
+  work?_ A pre-commit content gate enforces this where installed (`.githooks/pre-commit`) —
+  a backstop, not a substitute for the rule.
 
 ## Navigate narrow
 

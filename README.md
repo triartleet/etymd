@@ -191,7 +191,7 @@ Every key is optional; omit the file entirely and the defaults below apply.
 {
   "instructions": {
     // Audit these too — files detection would not find on its own.
-    "include": ["design/**/*.md"],
+    "include": ["docs/handbook/**/*.md"],
     // Leave these out. The classic case: a fork that inherits upstream's skills
     // and will never fix them, but must keep its OWN instruction layer honest.
     "exclude": [".claude/skills/**"],

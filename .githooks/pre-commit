@@ -1,3 +1,16 @@
 #!/usr/bin/env sh
 # etymd: process gate. Cheap, locally-knowable checks belong here (fast, blocks the commit).
+
+# Content gate: refuses to commit environment, employer, identity or cross-project detail
+# into a repository whose history is (or will be) public. The checker and its patterns are
+# machine-local by design — the patterns are themselves the strings being screened for — so
+# this hook is a no-op wherever the checker is not installed.
+#
+# Enable by installing the checker, or point CONTENT_GATE at it.
+# Bypass, with a reason: git commit --no-verify
+GATE="${CONTENT_GATE:-$HOME/.local/bin/public-repo-check}"
+if [ -x "$GATE" ]; then
+  "$GATE" || exit 1
+fi
+
 exit 0
