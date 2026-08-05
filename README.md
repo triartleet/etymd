@@ -254,8 +254,8 @@ steps:
 agent-context file: claims about your fleet (what exists, where, under which **profile** — the
 side of the wall an entry belongs to, `personal` or `corp`; the **wall** is the placement
 boundary between personal and employer content that the sweep polices). It rots like any
-AGENTS.md does, and `etymd fleet` keeps it true. Design record:
-[`docs/design/004-fleet-truth-guard.md`](docs/design/004-fleet-truth-guard.md). Both the
+AGENTS.md does, and `etymd fleet` keeps it true. Decision record:
+[`docs/decisions/004-fleet-truth-guard.md`](docs/decisions/004-fleet-truth-guard.md). Both the
 registry schema and the fleet `--json` schema are **experimental through 0.2.x**.
 
 Two files beside each other — the split is the privacy model:
@@ -359,9 +359,9 @@ Each value is resolved as a sibling of the etymd checkout.
 
 Without it — on a fresh clone or in CI — those suites skip cleanly and the rest still run.
 
-## Design record & roadmap
+## Decision record & roadmap
 
-[`docs/design/`](docs/design/) — 001 founding · 002 foundation re-lock · **003 the truth-guard
+[`docs/decisions/`](docs/decisions/) — 001 founding · 002 foundation re-lock · **003 the truth-guard
 pivot** (the current identity; includes the state-of-the-field investigation it rests on) ·
 **004 fleet mode** (the truth guard across your repositories).
 [`ROADMAP.md`](ROADMAP.md) — what's now / next / later, the pre-publish checklist, and the

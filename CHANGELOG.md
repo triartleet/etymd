@@ -51,7 +51,7 @@
 
 ### Minor Changes
 
-- a58d3bd: Fleet mode — the truth guard across your repositories (design record `docs/design/004-fleet-truth-guard.md`; registry + fleet `--json` schemas EXPERIMENTAL through 0.2.x).
+- a58d3bd: Fleet mode — the truth guard across your repositories (design record `docs/decisions/004-fleet-truth-guard.md`; registry + fleet `--json` schemas EXPERIMENTAL through 0.2.x).
 
   - New `state-freshness` truth lens: state/decisions artifacts dated by git committer dates only (never mtime); staleness is relative, so a dormant repo's old state is current; state char budget against the ~10k session-hook truncation; marker-gated decisions format checks (`Scope:`, duplicate/out-of-order `D-NNN` ids, past `Revisit:` dates as due review debt); ADR conventions (`docs/adr/`, `docs/decisions/`, `NNNN-*.md`) recognized natively.
   - New `etymd fleet` command family. The sweep runs a read-only audit per registered repo (`--manifest` required unless the cwd holds `registry.json` — no env var, no global pointer) and renders one line per project with a delta against `last.fleet.json`; detail only for new or risk findings. `fleet check` validates the manifest pair alone (dangling mappings, duplicate names, privacy leaks, machine paths). `fleet dismiss`/`fleet accept` resolve a project's finding from any cwd.
@@ -66,7 +66,7 @@ First public release.
 
 The truth guard for agent instruction files — **keep your agent instructions true**. (Formerly
 prototyped as "clothaid", a broader workflow installer; the pivot and its state-of-the-field
-rationale are recorded in `docs/design/003-truth-guard-pivot.md`.)
+rationale are recorded in `docs/decisions/003-truth-guard-pivot.md`.)
 
 - `etymd audit` — verify every instruction claim against the actual repo, through three lenses:
   - **instruction-truth**: command claims vs `package.json` scripts, path claims vs the tree,

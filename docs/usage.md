@@ -111,7 +111,7 @@ the result to account.
 ## `etymd fleet` — the truth guard across your repositories (EXPERIMENTAL through 0.2.x)
 
 One manifest, `registry.json`, registers every repo you work in (format in the README's
-"fleet manifest" section; design record in `docs/design/004-fleet-truth-guard.md`). The sweep
+"fleet manifest" section; decision record in `docs/decisions/004-fleet-truth-guard.md`). The sweep
 runs a read-only audit per resolved entry and checks the manifest itself plus the placement
 wall between personal and corp entries.
 

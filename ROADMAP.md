@@ -1,7 +1,7 @@
 # etymd — roadmap
 
 One objective governs everything here: **keep your agent instructions true**. An item that does
-not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.md`](docs/design/003-truth-guard-pivot.md).
+not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pivot.md`](docs/decisions/003-truth-guard-pivot.md).
 
 ## Now (prove it in daily use)
 
@@ -20,8 +20,8 @@ not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.m
 
 ### Shipped since 003
 
-- **Fleet mode, slices 1–2** (2026-07-30/31, design record
-  [`docs/design/004-fleet-truth-guard.md`](docs/design/004-fleet-truth-guard.md)): the
+- **Fleet mode, slices 1–2** (2026-07-30/31, decision record
+  [`docs/decisions/004-fleet-truth-guard.md`](docs/decisions/004-fleet-truth-guard.md)): the
   `state-freshness` truth lens (git-committer-date staleness, relative — a dormant repo's old
   state is current; decisions format checks; `Revisit:` debt), then the `fleet` command family —
   manifest loader for both shapes, `fleet` sweep with per-project delta rendering,
@@ -77,7 +77,7 @@ not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.m
     stay in scope. The remaining 3 CI-only-gate gaps are deliberate hooks divergence from
     upstream.
   - **wonderbee** — the contract deliberately says "do not start building"; as design sessions
-    produce the design record and the stack lands, the AGENTS.md fills in and `etymd audit`
+    produce the decision record and the stack lands, the AGENTS.md fills in and `etymd audit`
     tracks each claim as it becomes checkable. First re-approve will restamp pack v1 → v2.
   - **cc-gg-bridgy** — first push exercises the new pre-push gate live; when the repo gets CI,
     gate it on `etymd audit --fail-on risk` (the second external gate after pepshop). Also
@@ -92,8 +92,8 @@ not serve it does not ship. Design record: [`docs/design/003-truth-guard-pivot.m
 
 ## Later (only if the objective still leads)
 
-- **Fleet follow-ups, evidence-gated** (design record + gates in
-  [`docs/design/004-fleet-truth-guard.md`](docs/design/004-fleet-truth-guard.md)): sidecar
+- **Fleet follow-ups, evidence-gated** (decision record + gates in
+  [`docs/decisions/004-fleet-truth-guard.md`](docs/decisions/004-fleet-truth-guard.md)): sidecar
   `contractDir` audits (slice 3 — a manifest-side contract's claims verified against the corp repo
   root it describes); `fleet serve` as the read-only MCP access layer inside this package;
   `fleet init` scaffolding — not before three measured hand-scaffold events (pack v3 rides that

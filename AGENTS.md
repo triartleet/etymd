@@ -69,7 +69,7 @@ over repo-wide scans.
 - `src/ui/` — render + theme (all terminal output goes through here)
 - `test/` — vitest suites incl. `truth.test.ts` (the lying-fixture) and `corpus.test.ts`
   (read-only sibling-repo smokes)
-- `docs/design/` — the design record (001 founding · 002 foundation re-lock · 003 truth-guard
+- `docs/decisions/` — the decision record (001 founding · 002 foundation re-lock · 003 truth-guard
   pivot — the current identity · 004 fleet mode)
 - `ROADMAP.md` — now/next/later, the pre-publish checklist, accepted heuristic trade-offs
 
@@ -151,8 +151,8 @@ node dist/cli.js …   # run the built CLI
 
 ## Session protocol
 
-1. Read `docs/design/003-truth-guard-pivot.md` for the current locked identity before non-trivial
+1. Read `docs/decisions/003-truth-guard-pivot.md` for the current locked identity before non-trivial
    changes; 001/002 are the historical record (under the former name, clothaid).
-2. Work in small vertical slices; keep this map and the design record current in the same change —
+2. Work in small vertical slices; keep this map and the decision record current in the same change —
    `etymd audit` on this repo will flag what you forget.
 3. At session end, summarise what changed and what's next for the owner.
