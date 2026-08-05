@@ -87,7 +87,7 @@ export interface GitFacts {
   husky: boolean
   /** Distinct commit authors in recent history — the solo-vs-team profile signal. */
   recentAuthors?: number
-  /** Ticket-key prefix inferred from recent commit subjects (e.g. "NGRE2E"). */
+  /** Ticket-key prefix inferred from recent commit subjects (e.g. "PROJ"). */
   ticketKey?: string
 }
 

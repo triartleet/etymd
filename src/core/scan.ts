@@ -17,7 +17,7 @@ import {
 import type { DetectedArtifact, FreshnessFacts, ProjectFacts } from "./types.js"
 import { git, readJson } from "./util.js"
 
-/** Most-common ticket prefix (e.g. "NGRE2E") in recent commit subjects, if any dominates. */
+/** Most-common ticket prefix (e.g. "PROJ") in recent commit subjects, if any dominates. */
 function inferTicketKey(subjects: string): string | undefined {
   const counts = new Map<string, number>()
   for (const m of subjects.matchAll(/\b([A-Z][A-Z0-9]{1,9})-\d+\b/g)) {
