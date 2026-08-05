@@ -1,0 +1,224 @@
+/* VS Code markdown-preview reading stylesheet.
+   Wired via "markdown.styles" in the AL profile settings.
+   Theme-aware: VS Code stamps body.vscode-dark / .vscode-light / .vscode-high-contrast. */
+
+body {
+  /* The main fix: cap the measure. Prose past ~75 characters per line
+     forces the eye to hunt for the next line start. */
+  max-width: 46em;
+  margin: 0 auto;
+  padding: 1.5rem 2rem 6rem;
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Wide content earns the full width back, inside its own scroll box. */
+table,
+pre,
+.wide {
+  max-width: none;
+}
+
+/* ---- Headings: clear rhythm, so scanning beats reading ---- */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  line-height: 1.25;
+  font-weight: 650;
+  margin-top: 2.2em;
+  margin-bottom: 0.6em;
+}
+
+h1 {
+  font-size: 1.9em;
+  margin-top: 0;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.35));
+}
+
+h2 {
+  font-size: 1.4em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.22));
+}
+
+h3 {
+  font-size: 1.15em;
+}
+h4 {
+  font-size: 1.02em;
+  opacity: 0.95;
+}
+
+/* A bold line alone on its own paragraph is a pseudo-heading in generated
+   docs — give it heading air so question blocks separate visually. */
+p > strong:only-child {
+  display: inline-block;
+  margin-top: 0.6em;
+}
+
+/* ---- Body copy ---- */
+
+p,
+li {
+  /* Slightly tighter than headings, looser than default, for long reads. */
+  line-height: 1.65;
+}
+
+li {
+  margin-bottom: 0.25em;
+}
+li > p {
+  margin: 0.3em 0;
+}
+
+ul,
+ol {
+  padding-left: 1.5em;
+}
+
+blockquote {
+  margin-left: 0;
+  padding: 0.2em 1.1em;
+  border-left: 3px solid var(--vscode-textBlockQuote-border, rgba(127, 127, 127, 0.5));
+  background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.06));
+  border-radius: 0 4px 4px 0;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.3));
+  margin: 2.5em 0;
+}
+
+/* ---- Tables: the rival matrices are wide; let them scroll, not squeeze ---- */
+
+table {
+  display: block;
+  overflow-x: auto;
+  width: max-content;
+  max-width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92em;
+  margin: 1.2em 0;
+}
+
+th,
+td {
+  padding: 0.5em 0.85em;
+  border: 1px solid var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.3));
+  vertical-align: top;
+  /* Keep cells readable rather than letting one column run away. */
+  max-width: 26em;
+}
+
+th {
+  text-align: left;
+  font-weight: 650;
+  background: var(--vscode-editorWidget-background, rgba(127, 127, 127, 0.09));
+}
+
+tbody tr:nth-child(even) td {
+  background: rgba(127, 127, 127, 0.045);
+}
+
+/* ---- Code ---- */
+
+code {
+  font-size: 0.88em;
+  padding: 0.15em 0.36em;
+  border-radius: 3px;
+  background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.14));
+}
+
+/* Inline code is a REFERENCE (a path, a filename, a key) — not a program.
+   Something in the toolchain tokenizes it and paints `research/interrogation/`
+   in three colours, which reads as syntax where there is no syntax. Force one
+   flat colour, including any spans a highlighter injected inside. Fenced
+   blocks below are untouched and keep full highlighting. */
+:not(pre) > code,
+:not(pre) > code * {
+  color: var(--vscode-textPreformat-foreground, #c8b98a) !important;
+  background: none !important;
+  font-style: normal !important;
+  font-weight: inherit !important;
+  text-shadow: none !important;
+}
+
+pre {
+  padding: 0.9em 1.1em;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.5;
+  border: 1px solid var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.25));
+}
+
+/* Code blocks SCROLL, they do not wrap. VS Code's built-in preview stylesheet sets
+   `white-space: pre-wrap` on code, which defeats the `overflow-x: auto` above: a long
+   line reflows instead of overflowing, so the scrollbar never engages. Wrapping is
+   actively wrong here — it breaks ASCII diagrams and trailing comments onto their own
+   lines and silently misrepresents indentation, which in a code block is meaning.
+   `!important` because the rule being overridden is the editor's own. */
+pre,
+pre > code,
+pre > code * {
+  white-space: pre !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  word-wrap: normal !important;
+  tab-size: 2;
+}
+
+pre > code {
+  padding: 0;
+  background: none;
+  font-size: 0.86em;
+  /* The code element must be able to exceed the pre's width, or the parent has
+     nothing to scroll. */
+  display: inline-block;
+  min-width: 100%;
+}
+
+/* ---- Links: visible without shouting ---- */
+
+a {
+  text-decoration: none;
+  border-bottom: 1px solid rgba(127, 127, 127, 0.4);
+}
+
+a:hover {
+  border-bottom-color: currentColor;
+}
+
+/* ---- Light-theme tuning: the defaults run a touch harsh ---- */
+
+body.vscode-light {
+  color: #24292f;
+}
+
+body.vscode-light tbody tr:nth-child(even) td {
+  background: rgba(0, 0, 0, 0.025);
+}
+
+/* ---- Print / PDF export ---- */
+
+@media print {
+  body {
+    max-width: none;
+    font-size: 11pt;
+  }
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+  table,
+  pre {
+    break-inside: avoid;
+  }
+}
