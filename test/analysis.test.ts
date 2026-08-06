@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import { derivedCommands } from "../src/commands/gates.js"
 import { planWorkflow } from "../src/core/generate.js"
 import { isDriftEmpty, summarizeBaselineDrift } from "../src/core/facts.js"
 import type { ProjectFacts } from "../src/core/types.js"
@@ -159,6 +160,22 @@ describe("planWorkflow", () => {
     expect(prePush).toContain("typecheck")
     expect(prePush).not.toContain("lint")
     expect(prePush).toContain("--fail-on gap")
+  })
+
+  it("PINNED: regeneration keeps a test step the existing hook already ran", async () => {
+    // Found by migrating a real repo: the derived set is format/typecheck/lint, so a repo whose
+    // hook ran tests lost that check on regeneration — a silent downgrade, and the reason a
+    // generator that drops working checks cannot be trusted to regenerate anything. `test` is
+    // still not in the DEFAULT set (a slow suite in a push gate teaches people --no-verify);
+    // it is preserved only where the repo already opted in.
+    const f = facts({
+      commands: { raw: { test: "vitest", typecheck: "tsc" }, test: "test", typecheck: "typecheck" },
+    })
+    // A repo whose hook already ran tests keeps them.
+    expect(derivedCommands(f, "npm test || exit 1")).toContain("test")
+    // A repo that never ran them in a hook does not suddenly gain a slow step.
+    expect(derivedCommands(f, "npm run typecheck || exit 1")).not.toContain("test")
+    expect(derivedCommands(f)).not.toContain("test")
   })
 
   it("honours an explicit allowWriting override for a command that would otherwise be refused", () => {

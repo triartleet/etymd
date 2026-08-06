@@ -34,12 +34,23 @@ export interface GatesOptions {
   yes?: boolean
 }
 
-/** The scan's opening guess at what a pre-push gate should run. */
-function derivedCommands(facts: ProjectFacts): string[] {
+/**
+ * The scan's opening guess at what a pre-push gate should run.
+ *
+ * `test` is included when a repo already runs it in a hook. It is deliberately not part of the
+ * default set — a slow suite in a push gate is how people learn to reach for --no-verify — but
+ * REMOVING a check the repo already had is a silent downgrade, and a generator that quietly
+ * drops working checks cannot be trusted to regenerate anything.
+ */
+export function derivedCommands(facts: ProjectFacts, existingHook?: string): string[] {
   const c = facts.commands
-  return [c.formatCheck, c.typecheck, c.lint].filter(
+  const base = [c.formatCheck, c.typecheck, c.lint].filter(
     (k): k is string => Boolean(k) && isSafeGateCommand(c.raw[k as string]),
   )
+  if (c.test && existingHook && new RegExp(`\\b${c.test}\\b`).test(existingHook)) {
+    base.push(c.test)
+  }
+  return base
 }
 
 /** Show the derivations in one place, so "accept" is an informed keystroke rather than a guess. */
@@ -174,13 +185,18 @@ export async function run(opts: GatesOptions): Promise<void> {
   // Everything below is DERIVED and shown, not asked. Getting a derivation wrong costs a
   // slightly slow hook or a slightly strict audit — both one edit away — so the default path is
   // a single keystroke, and `customize` exists for the person who wants the choices.
+  // Read the hook being replaced BEFORE planning: regeneration must never silently drop a
+  // check the repo already runs.
+  const existingPrePush = await readText(path.join(opts.cwd, ".githooks", "pre-push"))
   const { config, present: hasConfig } = await readConfig(opts.cwd)
   // `--yes` records nothing: with no one to decide, the values are the scan's guess, and
   // freezing a guess as a decision would silently stop the gate tracking the repo's scripts.
   const configSource = { recorded: hasConfig, willRecord: !opts.yes }
   let gateConfig: GateConfig = {
     ...config.gates,
-    commands: config.gates.commands.length ? config.gates.commands : derivedCommands(facts),
+    commands: config.gates.commands.length
+      ? config.gates.commands
+      : derivedCommands(facts, existingPrePush ?? undefined),
     publishGate: config.gates.publishGate ?? facts.publishable,
   }
 
