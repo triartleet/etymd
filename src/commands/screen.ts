@@ -45,6 +45,21 @@ const MACHINE_PATH_RE = /\/(?:Users|home)\/[A-Za-z0-9._-]+\//
 /** An inline escape hatch for a line that must legitimately contain a screened string. */
 const ALLOW_MARKER = "allow-published-string"
 
+/**
+ * Repo-level exceptions, one extended-regex per line.
+ *
+ * The inline marker covers a line you can edit. This file covers the lines you cannot: a
+ * scanner's own source necessarily contains the patterns it screens for, its tests necessarily
+ * contain fixtures that must match, and a bundler strips comments so an inline marker would not
+ * survive into the artifact. Without it those files can never pass their own screen.
+ *
+ * It is a hole in the gate by construction, so it is read from the repo being screened, never
+ * from a shared location, and the file screens itself out (it contains every string it exempts).
+ */
+const ALLOW_FILE = ".etymd-screen-allow"
+/** The previous tool's filename, still honoured so a migrated repo keeps its exceptions. */
+const LEGACY_ALLOW_FILE = ".artifact-check-allow"
+
 export interface ScreenHit {
   file: string
   line: number
@@ -67,11 +82,26 @@ function compile(raw: string): RegExp[] {
     })
 }
 
-export function screenText(text: string, file: string, patterns: RegExp[]): ScreenHit[] {
+/**
+ * Is this pattern just the repo's own name? Compared against the pattern's literal source, so a
+ * pattern that IS the directory name is dropped while a broader one that merely contains it is
+ * not — an exemption must be exactly as wide as the repo's own name and no wider.
+ */
+export function isSelfName(pattern: RegExp, self: string): boolean {
+  return pattern.source.toLowerCase() === self.toLowerCase()
+}
+
+export function screenText(
+  text: string,
+  file: string,
+  patterns: RegExp[],
+  allow: RegExp[] = [],
+): ScreenHit[] {
   const hits: ScreenHit[] = []
   const lines = text.split("\n")
   for (const [i, line] of lines.entries()) {
     if (line.includes(ALLOW_MARKER)) continue
+    if (allow.some((re) => re.test(line))) continue
     for (const re of patterns) {
       if (re.test(line)) {
         hits.push({ file, line: i + 1, text: line.trim().slice(0, 160), reason: String(re) })
@@ -130,6 +160,22 @@ export async function run(opts: ScreenOptions): Promise<void> {
     return
   }
 
+  // Repo-level exceptions, read from the repo being screened.
+  const allowRaw =
+    (await readText(path.join(opts.cwd, ALLOW_FILE))) ??
+    (await readText(path.join(opts.cwd, LEGACY_ALLOW_FILE)))
+  const allow = allowRaw ? compile(allowRaw) : []
+
+  // A repo naming ITSELF is legitimate — its README, its package name and its own docs all have
+  // to call the project something. The cross-project rule is about disclosing OTHER projects, so
+  // the current repo's own name is dropped from the active patterns. Without this, a pattern
+  // list that names your projects flags a repo's every self-reference: measured at over a
+  // thousand hits in a single repo, which is not a report anyone reads.
+  const self = path.basename(
+    (await git(opts.cwd, ["rev-parse", "--show-toplevel"])) || path.resolve(opts.cwd),
+  )
+  const active = self ? patterns.filter((re) => !isSelfName(re, self)) : patterns
+
   const hits: ScreenHit[] = []
   let scanned = 0
 
@@ -144,7 +190,7 @@ export async function run(opts: ScreenOptions): Promise<void> {
       .filter((l) => !l.startsWith("#"))
       .join("\n")
     scanned = 1
-    hits.push(...screenText(body, "commit message", patterns))
+    hits.push(...screenText(body, "commit message", active, allow))
   } else if (opts.scope === "dir") {
     const dir = opts.target
     if (!dir) throw new Error("--dir needs a directory")
@@ -154,7 +200,7 @@ export async function run(opts: ScreenOptions): Promise<void> {
       const raw = await readText(f)
       if (raw === null) continue
       scanned++
-      hits.push(...screenText(raw, path.relative(dir, f), patterns))
+      hits.push(...screenText(raw, path.relative(dir, f), active, allow))
     }
   } else {
     const listing =
@@ -163,12 +209,15 @@ export async function run(opts: ScreenOptions): Promise<void> {
         : await git(opts.cwd, ["diff", "--cached", "--name-only", "--diff-filter=ACM"])
     const files = (listing ?? "").split("\n").filter(Boolean)
     for (const rel of files) {
+      // The allowlist necessarily contains every string it exempts, so screening it would flag
+      // each entry against itself — the same reason a scanner is exempt from its own patterns.
+      if (rel === ALLOW_FILE || rel === LEGACY_ALLOW_FILE) continue
       const abs = path.join(opts.cwd, rel)
       if (!(await pathExists(abs))) continue
       const raw = await readText(abs)
       if (raw === null) continue
       scanned++
-      hits.push(...screenText(raw, rel, patterns))
+      hits.push(...screenText(raw, rel, active, allow))
     }
   }
 

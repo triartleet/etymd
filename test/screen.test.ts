@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { screenText } from "../src/commands/screen.js"
+import { isSelfName, screenText } from "../src/commands/screen.js"
 
 const patterns = [/AcmeCorp/i, /internal\.example\.com/i]
 
@@ -44,5 +44,31 @@ describe("content screen", () => {
 
   it("finds nothing when there is nothing — no patterns means no findings", () => {
     expect(screenText("AcmeCorp everywhere", "f", [])).toEqual([])
+  })
+
+  it("honours repo-level allow patterns for lines that cannot carry an inline marker", () => {
+    // A scanner's own source contains the strings it screens for, and a bundler strips
+    // comments — so some exemptions cannot live on the line itself.
+    const allow = [/describing its own check/i]
+    expect(screenText("AcmeCorp, describing its own check", "f", patterns, allow)).toEqual([])
+    // The exemption is narrow: an ordinary hit beside it still reports.
+    expect(screenText("AcmeCorp in plain prose", "f", patterns, allow)).toHaveLength(1)
+  })
+
+  it("an allow pattern suppresses a machine path too, not just a listed pattern", () => {
+    const home = `/${"Users"}/someone/x`
+    expect(screenText(home, "f", [], [/someone/])).toEqual([])
+  })
+})
+
+describe("self-name exemption", () => {
+  it("drops a pattern that IS the repo's own name, keeps one that merely contains it", () => {
+    // A repo has to call itself something in its own README and package name; the
+    // cross-project rule is about disclosing OTHER projects.
+    expect(isSelfName(/widget/i, "widget")).toBe(true)
+    expect(isSelfName(/WIDGET/i, "widget")).toBe(true)
+    // Narrower than the name, or broader than it, both stay active.
+    expect(isSelfName(/widget-internal/i, "widget")).toBe(false)
+    expect(isSelfName(/wid/i, "widget")).toBe(false)
   })
 })
