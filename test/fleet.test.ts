@@ -8,6 +8,8 @@ import { promisify } from "node:util"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { loadFleetManifest } from "../src/core/fleet.js"
+import { planWorkflow } from "../src/core/generate.js"
+import { scanProject } from "../src/core/scan.js"
 import { parseFailOnTier } from "../src/engine/finding.js"
 import { sweep as sweepCmd, dismiss as fleetDismiss } from "../src/commands/fleet.js"
 import {
@@ -852,6 +854,59 @@ describe.skipIf(!existsSync(CLI))("fleet CLI wiring (built binary)", () => {
         { cwd: dir },
       ),
     ).rejects.toThrow(/already registered/)
+  })
+})
+
+describe("fleet gate drift", () => {
+  it("PINNED: names a repo missing a gate its siblings install — the gap invisible from inside", async () => {
+    // The case this check exists for: a repo wired for screening whose commit-msg door was
+    // simply never installed. Nothing inside that repo can notice.
+    await initRepo("partial")
+    await fs.mkdir(path.join(dir, "partial", ".githooks"), { recursive: true })
+    await write("partial/.githooks/pre-commit", "#!/usr/bin/env sh\nexit 0\n")
+    const manifestPath = await writeHub([personal("partial")])
+    const { findings } = await collectWallFindings(await manifestAt(manifestPath))
+    const missing = findings.find((f) => f.id === "fleet-manifest/gate-missing:partial")
+    expect(missing?.tier).toBe("gap")
+    expect(missing?.evidence.join(" ")).toContain("commit-msg")
+  })
+
+  it("does not flag expected per-repo variation as drift", async () => {
+    // Regenerating from each repo's OWN facts is what makes this safe: two repos with
+    // different package managers produce different hooks and both are correct.
+    await initRepo("full")
+    const facts = await scanProject(path.join(dir, "full"))
+    const planned = await planWorkflow(path.join(dir, "full"), facts, {
+      agents: false,
+      gates: true,
+    })
+    await fs.mkdir(path.join(dir, "full", ".githooks"), { recursive: true })
+    for (const f of planned.filter((p) => p.executable)) {
+      await write(path.join("full", f.path), f.contents)
+    }
+    const manifestPath = await writeHub([personal("full")])
+    const { findings } = await collectWallFindings(await manifestAt(manifestPath))
+    expect(findings.filter((f) => f.id.includes("gate-")).map((f) => f.id)).toEqual([])
+  })
+
+  it("discloses a husky repo rather than flagging it — git runs one hook path", async () => {
+    await initRepo("huskyrepo")
+    await write("huskyrepo/package.json", JSON.stringify({ name: "h", devDependencies: {} }))
+    await fs.mkdir(path.join(dir, "huskyrepo", ".husky", "_"), { recursive: true })
+    await gitIn(path.join(dir, "huskyrepo"), null, ["config", "core.hooksPath", ".husky/_"])
+    const manifestPath = await writeHub([personal("huskyrepo")])
+    const { findings, disclosures } = await collectWallFindings(await manifestAt(manifestPath))
+    expect(findings.some((f) => f.id.includes("gate-"))).toBe(false)
+    expect(disclosures.join(" ")).toContain("husky")
+  })
+
+  it("leaves corp entries out of the personal gate model entirely", async () => {
+    await initRepo("corp-work")
+    const manifestPath = await writeHub([corp("c-one")], {
+      local: { machineProfile: "corp", dirs: { "c-one": path.join(dir, "corp-work") } },
+    })
+    const { findings } = await collectWallFindings(await manifestAt(manifestPath))
+    expect(findings.some((f) => f.id.includes("gate-"))).toBe(false)
   })
 })
 

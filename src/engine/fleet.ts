@@ -622,6 +622,82 @@ async function checkCorpEmails(
   }
 }
 
+/**
+ * Gate drift: what a repo's hooks ARE versus what this etymd would generate for it.
+ *
+ * A per-repo lens cannot ask this. It can see that a hook exists, but not that a hook exists in
+ * every OTHER repo and is missing here — and the missing one is the dangerous case, because a
+ * gap is invisible from inside the repo that has it. The motivating case was a repo fully wired
+ * for content screening whose commit-msg door had simply never been installed: every other gate
+ * present, that one absent, and nothing to notice it until someone compared by hand.
+ *
+ * Expected variation is not drift. A pnpm repo generates `pnpm typecheck` where an npm repo
+ * generates `npm run typecheck`, and both are correct — so the comparison regenerates from each
+ * repo's OWN facts and config rather than diffing repos against each other. What it reports is
+ * a gate the pack would emit here and does not find, or a committed hook whose content no
+ * longer matches what its own inputs produce.
+ */
+async function checkGateDrift(
+  manifest: FleetManifest,
+  findings: Finding[],
+  disclosures: string[],
+): Promise<void> {
+  const { planWorkflow } = await import("../core/generate.js")
+  const { scanProject } = await import("../core/scan.js")
+  const { readConfig } = await import("../core/config.js")
+
+  for (const entry of manifest.entries) {
+    const root = entry.resolvedRoot
+    if (!root || !(await isDirectory(root))) continue
+    // Corp repos are machine-pinned and out of the personal gate model; a fork on husky runs a
+    // different hook path entirely, and `git` runs exactly one. Reporting either would be noise
+    // that never resolves.
+    if (entry.profile === "corp" || entry.private) continue
+
+    const facts = await scanProject(root)
+    if (!facts.git.isRepo) continue
+    if (facts.hooks.source === "husky" || facts.hooks.source === "husky-legacy") {
+      disclosures.push(
+        `${entry.name}: hooks managed by ${facts.hooks.source} — gate drift not comparable against the .githooks pack`,
+      )
+      continue
+    }
+
+    const { config } = await readConfig(root)
+    const planned = (
+      await planWorkflow(root, facts, { agents: false, gates: true, gateConfig: config.gates })
+    ).filter((f) => f.executable)
+
+    const missing = planned.filter((f) => !f.exists).map((f) => f.path)
+    const stale = planned.filter((f) => f.exists && f.differs).map((f) => f.path)
+
+    if (missing.length) {
+      findings.push(
+        finding(
+          `${FLEET_LENS}/gate-missing:${entry.name}`,
+          "gap",
+          `\`${entry.name}\` is missing ${missing.length} gate${missing.length === 1 ? "" : "s"} the pack would install`,
+          missing.map((m) => `${entry.name}: no ${m}`),
+          "A gate absent in one repo is invisible from inside it — every commit there skips a check its siblings run.",
+          "Run `etymd gates` in that repo.",
+        ),
+      )
+    }
+    if (stale.length) {
+      findings.push(
+        finding(
+          `${FLEET_LENS}/gate-stale:${entry.name}`,
+          "polish",
+          `\`${entry.name}\` has ${stale.length} gate${stale.length === 1 ? "" : "s"} that differ from what its own inputs generate`,
+          stale.map((s) => `${entry.name}: ${s}`),
+          "A hand-edited or outdated hook drifts from the pack silently — the repo believes it runs checks the file no longer contains.",
+          "Re-run `etymd gates` (it asks before overwriting), or record the intent in .etymd/config.json.",
+        ),
+      )
+    }
+  }
+}
+
 /** All fleet-scope wall checks. Each check that cannot run says so — undetermined, not clean. */
 export async function collectWallFindings(
   manifest: FleetManifest,
@@ -633,6 +709,7 @@ export async function collectWallFindings(
   await checkManifestRepoMachinePaths(manifest, findings, disclosures)
   await checkHygieneNeedles(manifest, findings, disclosures)
   await checkCorpEmails(manifest, findings, disclosures)
+  await checkGateDrift(manifest, findings, disclosures)
   return { findings, disclosures }
 }
 

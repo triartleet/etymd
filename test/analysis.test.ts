@@ -31,6 +31,7 @@ export function facts(overrides: Partial<ProjectFacts> = {}): ProjectFacts {
     },
     ci: { system: "none", files: [] },
     publishable: false,
+    publishRoute: "npm",
     hooks: {
       source: "none",
       preCommit: false,

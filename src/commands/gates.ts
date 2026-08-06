@@ -14,10 +14,19 @@ import { isSafeGateCommand, runPrefix } from "../pack/templates.js"
 import { print, renderPlan, section } from "../ui/render.js"
 import { glyph, theme } from "../ui/theme.js"
 
-/** The publish door: the script etymd owns, and the one package.json key that fires it. */
+/**
+ * The publish door: the script etymd owns, and the manifest key that fires it.
+ *
+ * The key depends on the publish route. npm runs `prepublishOnly`; `vsce` ignores that key
+ * completely and runs `vscode:prepublish`, so wiring the npm key into an extension installs a
+ * gate that never fires — the worst kind, because the repo looks guarded.
+ */
 const PUBLISH_GATE_SCRIPT = "scripts/artifact-check.sh"
-const PUBLISH_GATE_KEY = "prepublishOnly"
 const PUBLISH_GATE_VALUE = `./${PUBLISH_GATE_SCRIPT}`
+
+function publishGateKey(route: ProjectFacts["publishRoute"]): string {
+  return route === "vscode" ? "vscode:prepublish" : "prepublishOnly"
+}
 
 export interface GatesOptions {
   cwd: string
@@ -252,6 +261,7 @@ export async function run(opts: GatesOptions): Promise<void> {
   const wrotePublishGate = result.written.includes(PUBLISH_GATE_SCRIPT)
   if (wrotePublishGate) {
     const pkgPath = path.join(opts.cwd, "package.json")
+    const PUBLISH_GATE_KEY = publishGateKey(facts.publishRoute)
     {
       const merged = await ensurePackageScript(pkgPath, PUBLISH_GATE_KEY, PUBLISH_GATE_VALUE)
       if (merged.outcome === "added")

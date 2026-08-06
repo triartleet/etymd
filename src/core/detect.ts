@@ -24,7 +24,7 @@ export interface PackageJson {
   version?: string
   private?: boolean
   packageManager?: string
-  engines?: { node?: string }
+  engines?: { node?: string; vscode?: string }
   workspaces?: string[] | { packages?: string[] }
   scripts?: Record<string, string>
   dependencies?: Record<string, string>

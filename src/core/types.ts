@@ -125,10 +125,20 @@ export interface ProjectFacts {
   hooks: HookFacts
   /**
    * This project would publish something if asked — a manifest exists and does not declare
-   * `private: true`. npm's own opt-out is the honest signal: it is the package author stating
-   * that nothing ever ships, which is exactly when a publish-time gate would be noise.
+   * `private: true`.
+   *
+   * A GUESS, not a fact: npm treats a missing `private` as publishable, which is right about
+   * npm's semantics and wrong about a local fork nobody will ever publish. It seeds the plan;
+   * `gates.publishGate` in `.etymd/config.json` overrides it for good.
    */
   publishable: boolean
+  /**
+   * How this project publishes, when it does. The route decides which manifest key fires a
+   * publish-time gate: npm runs `prepublishOnly`, while `vsce` ignores that key entirely and
+   * runs `vscode:prepublish` — so wiring the npm key into an extension is a gate that silently
+   * never runs.
+   */
+  publishRoute: "npm" | "vscode" | "none"
   artifacts: DetectedArtifact[]
   /** Optional: baselines approved by older versions predate this fact. */
   freshness?: FreshnessFacts

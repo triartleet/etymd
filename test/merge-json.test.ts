@@ -64,6 +64,18 @@ describe("package.json script merge", () => {
     expect(JSON.parse(text as string).scripts).toEqual({ prepublishOnly: "x" })
   })
 
+  it("wires the key the publish route actually runs", () => {
+    // vsce ignores prepublishOnly entirely, so wiring it into an extension installs a gate that
+    // never fires — the worst kind, because the repo then looks guarded.
+    const npmPkg = mergeScriptInto(PKG, "prepublishOnly", "./scripts/artifact-check.sh")
+    expect(JSON.parse(npmPkg.text as string).scripts.prepublishOnly).toBeDefined()
+
+    const extPkg = mergeScriptInto(PKG, "vscode:prepublish", "./scripts/artifact-check.sh")
+    const parsed = JSON.parse(extPkg.text as string) as { scripts: Record<string, string> }
+    expect(parsed.scripts["vscode:prepublish"]).toBe("./scripts/artifact-check.sh")
+    expect(parsed.scripts.prepublishOnly).toBeUndefined()
+  })
+
   it("reports an unparsable manifest instead of destroying it", () => {
     const { text, result } = mergeScriptInto("{ not json", "k", "v")
     expect(result.outcome).toBe("unparsable")

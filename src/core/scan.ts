@@ -174,6 +174,9 @@ export async function scanProject(root: string, opts: ScanOptions = {}): Promise
     ci,
     hooks,
     publishable: Boolean(rootPkg) && rootPkg?.private !== true,
+    // `engines.vscode` is what makes a package an extension, and extensions publish through
+    // vsce — which never runs prepublishOnly.
+    publishRoute: !rootPkg ? "none" : rootPkg.engines?.vscode ? "vscode" : "npm",
     artifacts,
     freshness,
     tree,
