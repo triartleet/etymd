@@ -3,7 +3,13 @@ import { describe, expect, it } from "vitest"
 import { planWorkflow } from "../src/core/generate.js"
 import { isDriftEmpty, summarizeBaselineDrift } from "../src/core/facts.js"
 import type { ProjectFacts } from "../src/core/types.js"
-import { generateAgentsMd, generatePrePushHook, isSafeGateCommand } from "../src/pack/templates.js"
+import {
+  generateAgentsMd,
+  generateCommitMsgHook,
+  generatePreCommitHook,
+  generatePrePushHook,
+  isSafeGateCommand,
+} from "../src/pack/templates.js"
 
 export function facts(overrides: Partial<ProjectFacts> = {}): ProjectFacts {
   return {
@@ -24,6 +30,7 @@ export function facts(overrides: Partial<ProjectFacts> = {}): ProjectFacts {
       typecheck: "typecheck",
     },
     ci: { system: "none", files: [] },
+    publishable: false,
     hooks: {
       source: "none",
       preCommit: false,
@@ -101,8 +108,50 @@ describe("planWorkflow", () => {
   it("plans only what onboarding scaffolds: contract + gates", async () => {
     const plan = await planWorkflow("/nonexistent-root", facts(), { agents: true, gates: true })
     const paths = plan.map((p) => p.path)
-    expect(paths).toEqual(["AGENTS.md", ".githooks/pre-commit", ".githooks/pre-push"])
+    expect(paths).toEqual([
+      "AGENTS.md",
+      ".githooks/pre-commit",
+      ".githooks/commit-msg",
+      ".githooks/pre-push",
+    ])
     expect(plan.every((p) => p.exists === false)).toBe(true)
+  })
+
+  it("offers the publish screen only where something is actually published", async () => {
+    const notPublished = await planWorkflow("/nonexistent-root", facts({ publishable: false }), {
+      agents: false,
+      gates: true,
+    })
+    expect(notPublished.map((p) => p.path)).not.toContain("scripts/artifact-check.sh")
+
+    const published = await planWorkflow("/nonexistent-root", facts({ publishable: true }), {
+      agents: false,
+      gates: true,
+    })
+    expect(published.map((p) => p.path)).toContain("scripts/artifact-check.sh")
+
+    // An explicit option overrides the derivation both ways — a repo can publish by a route
+    // npm cannot see, or decline the door entirely.
+    const forcedOff = await planWorkflow("/nonexistent-root", facts({ publishable: true }), {
+      agents: false,
+      gates: true,
+      publishGate: false,
+    })
+    expect(forcedOff.map((p) => p.path)).not.toContain("scripts/artifact-check.sh")
+  })
+
+  it("PINNED: every generated gate is inert without a checker — safe to commit to a public repo", () => {
+    // The hooks carry no patterns and no policy: they resolve an external checker and no-op
+    // when it is absent. This is what lets the same file be committed anywhere.
+    const hooks = [generatePreCommitHook(), generateCommitMsgHook(), generatePrePushHook(facts())]
+    for (const hook of hooks) {
+      expect(hook).toMatch(/if \[ -x "\$GATE" \]/)
+      expect(hook).toMatch(/^#!\/usr\/bin\/env sh/)
+    }
+    // The screen must never be inlined into a tracked file — the patterns ARE the secret.
+    for (const hook of hooks) {
+      expect(hook).not.toMatch(/grep -[a-zA-Z]*f? ['"]?(employer|corp|@)/i)
+    }
   })
 
   it("plans nothing when both toggles are off", async () => {

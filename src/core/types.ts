@@ -123,6 +123,12 @@ export interface ProjectFacts {
     files: string[]
   }
   hooks: HookFacts
+  /**
+   * This project would publish something if asked — a manifest exists and does not declare
+   * `private: true`. npm's own opt-out is the honest signal: it is the package author stating
+   * that nothing ever ships, which is exactly when a publish-time gate would be noise.
+   */
+  publishable: boolean
   artifacts: DetectedArtifact[]
   /** Optional: baselines approved by older versions predate this fact. */
   freshness?: FreshnessFacts

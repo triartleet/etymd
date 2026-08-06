@@ -19,6 +19,43 @@ import { readText } from "./util.js"
 
 export type FleetProfile = "personal" | "corp"
 
+/**
+ * How exposed an entry's history is, or could plausibly become. A SAFETY PREDICATE, not a label:
+ * it decides whether content screening applies, so absence must never read as the permissive
+ * answer. `checkManifest` treats an undeclared non-corp entry as a finding — a repo published
+ * without ever answering the question is exactly the case a default would hide.
+ *
+ *   `public-repo`   already public — outside-contribution surface.
+ *   `public-bound`  private today, plausibly public later. Screened as hard as public, because
+ *                   publishing exposes ALL history: the scrub must precede the first commit,
+ *                   not the visibility flip.
+ *   `private`       not destined to be published. An ANSWER, not the absence of one.
+ *
+ * Corp entries do not carry it — `profile: "corp"` implies the answer (machine-pinned, never
+ * publishable), so requiring it there would be ceremony.
+ */
+export type FleetTrust = "public-repo" | "public-bound" | "private"
+
+export const FLEET_TRUST_VALUES: readonly FleetTrust[] = ["public-repo", "public-bound", "private"]
+
+export function isFleetTrust(value: unknown): value is FleetTrust {
+  return typeof value === "string" && (FLEET_TRUST_VALUES as readonly string[]).includes(value)
+}
+
+/**
+ * Fleet-wide orientation: the one entry every other entry is guided by.
+ *
+ * Declared ONCE at the manifest level rather than as a per-entry link, because the relationship
+ * is constant — a per-entry field carries no information and can be forgotten, which is exactly
+ * how three entries came to be silently unlinked. Hoisting it makes the orphan state
+ * unrepresentable instead of merely detectable. A fleet with no orientation root simply omits
+ * the block; etymd never assumes one exists.
+ */
+export interface FleetOrientation {
+  /** Registered name of the orientation root. Only the root itself is exempt from being guided. */
+  root: string
+}
+
 export interface FleetContract {
   state?: string
   decisions?: string
@@ -36,8 +73,14 @@ export interface FleetEntry {
   path?: string
   /** Remote name of the upstream this repo forks — freshness measures fork-authored commits. */
   upstream?: string
-  /** `"public-repo"` marks an outside-contribution surface (hygiene needles apply). */
-  trust?: string
+  /**
+   * How exposed this entry is — see {@link FleetTrust}. `"public-repo"` marks an
+   * outside-contribution surface (hygiene needles apply). Undeclared on a non-corp entry is a
+   * `fleet check` finding, never a silent "private".
+   */
+  trust?: FleetTrust
+  /** A declared `trust` value outside the vocabulary — preserved verbatim so the check can name it. */
+  trustRaw?: string
   staleAfterDays?: number
   /** Per-entry state char-budget override (ships unset — the schema slot exists). */
   stateBudget?: number
@@ -64,6 +107,8 @@ export interface FleetManifest {
   dir: string
   /** Resolved absolute fleet root (registry shape), when declared. */
   root?: string
+  /** Fleet-wide orientation root, when the manifest declares one. Absent = this fleet has none. */
+  orientation?: FleetOrientation
   machineProfile?: FleetProfile
   corpHosts: string[]
   labels: Record<string, string>
@@ -203,7 +248,10 @@ function loadRegistryEntries(
       private: rec.private === true,
       path: asString(rec.path),
       upstream: asString(rec.upstream),
-      trust: asString(rec.trust),
+      // An unknown value is NOT coerced to a default: trust gates content screening, so a typo
+      // must surface as "undeclared" (a finding) rather than quietly picking an answer.
+      trust: isFleetTrust(rec.trust) ? rec.trust : undefined,
+      trustRaw: asString(rec.trust),
       staleAfterDays: typeof rec.staleAfterDays === "number" ? rec.staleAfterDays : undefined,
       stateBudget: typeof rec.stateBudget === "number" ? rec.stateBudget : undefined,
       contract,
@@ -346,6 +394,25 @@ export async function loadFleetManifest(manifestPath: string): Promise<FleetMani
         : undefined
     const rootRaw = asString(local.data.root) ?? asString(parsed.root)
     if (rootRaw) manifest.root = path.resolve(dir, expandTilde(rootRaw))
+    const orientationRec = asRecord(parsed.orientation)
+    if (orientationRec) {
+      const orientationRoot = asString(orientationRec.root)
+      if (orientationRoot) manifest.orientation = { root: orientationRoot }
+      else {
+        manifest.problems.push({
+          kind: "bad-shape",
+          file: manifestFile,
+          detail:
+            "`orientation` declares no `root` name — the fleet's orientation cannot be resolved",
+        })
+      }
+    } else if (parsed.orientation !== undefined) {
+      manifest.problems.push({
+        kind: "bad-shape",
+        file: manifestFile,
+        detail: '`orientation` must be an object (`{ "root": "<name>" }`) — ignored',
+      })
+    }
     loadRegistryEntries(parsed.projects, manifest, manifestFile)
   } else if (Array.isArray(parsed.sources)) {
     manifest.shape = "corpus"

@@ -16,12 +16,5 @@
   // These two stay on: between them they found every real defect — links left behind by a
   // file move, a doubled path prefix, and a fragment pointing at a renumbered heading.
   "markdown.validate.fileLinks.enabled": "warning",
-  "markdown.validate.fragmentLinks.enabled": "warning",
-
-  // The preview stylesheet MUST be workspace-relative: VS Code resolves markdown.styles
-  // against the folder open in the Explorer and will not reliably load an absolute local
-  // path, so a user-settings copy does nothing. This file is a verbatim copy of the
-  // machine-local source. It also makes code blocks SCROLL rather than wrap — wrapping
-  // breaks ASCII diagrams and misrepresents indentation. Removing it breaks the preview.
-  "markdown.styles": [".vscode/markdown-preview.css"]
+  "markdown.validate.fragmentLinks.enabled": "warning"
 }

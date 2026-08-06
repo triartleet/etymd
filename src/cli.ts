@@ -226,6 +226,36 @@ fleet
   )
 
 fleet
+  .command("add")
+  .argument("<dir>", "directory of the project to register")
+  .description("Register a project — refuses to write an entry missing a mandatory field")
+  .option("--name <name>", "registered name (defaults to the directory's basename)")
+  .option("--kind <kind>", "entry kind (defaults to a value derived from the scan)")
+  .option("--profile <profile>", "personal | corp (default: personal)")
+  .option(
+    "--trust <level>",
+    "public-repo | public-bound | private — mandatory for personal entries",
+  )
+  .option("-y, --yes", "skip prompts; every mandatory value must be passed as a flag")
+  .option("--manifest <file>", "the fleet manifest — required unless the cwd holds registry.json")
+  .action((dir, opts, cmd) =>
+    action(async () => {
+      const { add } = await import("./commands/fleet.js")
+      const shared = cmd.optsWithGlobals() as FleetSharedOpts
+      await add({
+        cwd: resolveCwd(cmd),
+        manifest: shared.manifest,
+        target: dir,
+        name: opts.name,
+        kind: opts.kind,
+        profile: opts.profile,
+        trust: opts.trust,
+        yes: opts.yes,
+      })
+    }),
+  )
+
+fleet
   .command("dismiss")
   .argument("<name>", "the registered project name")
   .argument("<finding-id>", "the finding id (from `etymd fleet`) to dismiss")
@@ -262,6 +292,31 @@ fleet
       const { accept } = await import("./commands/fleet.js")
       const opts = cmd.optsWithGlobals() as FleetSharedOpts
       await accept({ cwd: resolveCwd(cmd), manifest: opts.manifest, name, id, reason: opts.reason })
+    }),
+  )
+
+program
+  .command("screen")
+  .description(
+    "Content screen: check for text that must never be published. Bring your own patterns — etymd ships none.",
+  )
+  .option("--staged", "screen what a commit is about to add (default)")
+  .option("--tree", "screen every tracked file — what is about to leave the machine")
+  .option("--message <file>", "screen a commit message (the commit-msg hook's $1)")
+  .option("--dir <dir>", "screen an unpacked build artifact — what actually ships")
+  .option("--patterns <file>", "pattern file (default: ~/.config/etymd/screen-patterns)")
+  .option("--advisory", "report without failing")
+  .action((opts, cmd) =>
+    action(async () => {
+      const { run } = await import("./commands/screen.js")
+      const scope = opts.message ? "message" : opts.dir ? "dir" : opts.tree ? "tree" : "staged"
+      await run({
+        cwd: resolveCwd(cmd),
+        scope,
+        target: opts.message ?? opts.dir,
+        patterns: opts.patterns,
+        advisory: opts.advisory,
+      })
     }),
   )
 

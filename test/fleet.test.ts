@@ -84,11 +84,24 @@ async function initRepo(
 
 async function writeHub(
   projects: unknown[],
-  opts: { local?: Record<string, unknown> | null; root?: string } = {},
+  opts: {
+    local?: Record<string, unknown> | null
+    root?: string
+    orientation?: unknown
+  } = {},
 ) {
   await write(
     "hub/registry.json",
-    JSON.stringify({ registryVersion: 1, root: opts.root ?? "..", projects }, null, 2) + "\n",
+    JSON.stringify(
+      {
+        registryVersion: 1,
+        root: opts.root ?? "..",
+        ...(opts.orientation === undefined ? {} : { orientation: opts.orientation }),
+        projects,
+      },
+      null,
+      2,
+    ) + "\n",
   )
   if (opts.local !== null) {
     await write(
@@ -124,11 +137,14 @@ async function findDirsNamed(root: string, needle: string): Promise<string[]> {
   return hits
 }
 
+// `trust` is mandatory on non-corp entries, so the well-formed default carries one; the tests
+// that exercise the undeclared/unknown cases pass `trust` explicitly to override it.
 const personal = (name: string, extra: Record<string, unknown> = {}) => ({
   name,
   kind: "repo",
   profile: "personal",
   path: name,
+  trust: "private",
   contract: {},
   ...extra,
 })
@@ -558,6 +574,62 @@ describe("fleet check — manifest truth", () => {
     expect(findings.some((f) => f.id === "fleet-manifest/parse-error:registry.json")).toBe(true)
     expect(findings.find((f) => f.id.includes("parse-error"))?.tier).toBe("risk")
   })
+
+  it("PINNED: an undeclared trust is a RISK, never a silent private — corp entries are exempt", async () => {
+    await initRepo("nodecl")
+    const manifestPath = await writeHub([
+      { name: "nodecl", kind: "repo", profile: "personal", path: "nodecl", contract: {} },
+      corp("c-one"),
+    ])
+    const { findings } = await checkManifest(await manifestAt(manifestPath))
+    const undeclared = findings.find((f) => f.id === "fleet-manifest/undeclared-trust:nodecl")
+    expect(undeclared?.tier).toBe("risk")
+    // The predicate gates content screening — a corp entry's profile already answers it.
+    expect(findings.some((f) => f.id.includes("trust:c-one"))).toBe(false)
+  })
+
+  it("an out-of-vocabulary trust is flagged rather than coerced to a default", async () => {
+    await initRepo("typo")
+    const manifestPath = await writeHub([personal("typo", { trust: "pubic-repo" })])
+    const manifest = await manifestAt(manifestPath)
+    // Never silently read as a known level: the parsed value stays undefined and the raw
+    // string is preserved so the finding can name the typo.
+    expect(manifest.entries.find((e) => e.name === "typo")?.trust).toBeUndefined()
+    const { findings } = await checkManifest(manifest)
+    const bad = findings.find((f) => f.id === "fleet-manifest/unknown-trust:typo")
+    expect(bad?.tier).toBe("risk")
+    expect(bad?.claim).toContain("pubic-repo")
+  })
+
+  it("declaring `private` satisfies the predicate — an answer, not the absence of one", async () => {
+    await initRepo("declared")
+    const manifestPath = await writeHub([personal("declared", { trust: "private" })])
+    const { findings } = await checkManifest(await manifestAt(manifestPath))
+    expect(findings.some((f) => f.id.includes("trust:declared"))).toBe(false)
+  })
+
+  it("a dangling orientation root is a finding; a resolving one is silent", async () => {
+    await initRepo("root-repo")
+    const dangling = await writeHub([personal("root-repo")], {
+      orientation: { root: "nobody" },
+    })
+    const { findings } = await checkManifest(await manifestAt(dangling))
+    expect(findings.some((f) => f.id === "fleet-manifest/dangling-orientation:nobody")).toBe(true)
+
+    const resolving = await writeHub([personal("root-repo")], {
+      orientation: { root: "root-repo" },
+    })
+    const ok = await checkManifest(await manifestAt(resolving))
+    expect(ok.findings.some((f) => f.id.includes("dangling-orientation"))).toBe(false)
+  })
+
+  it("a malformed orientation block is a bad-shape problem, not a crash", async () => {
+    await initRepo("alpha")
+    const manifestPath = await writeHub([personal("alpha")], { orientation: "alpha" })
+    const manifest = await manifestAt(manifestPath)
+    expect(manifest.orientation).toBeUndefined()
+    expect(manifest.problems.some((p) => p.kind === "bad-shape")).toBe(true)
+  })
 })
 
 describe("fleet wall findings", () => {
@@ -690,6 +762,96 @@ describe.skipIf(!existsSync(CLI))("fleet CLI wiring (built binary)", () => {
     const parsed = JSON.parse(stdout) as Record<string, unknown>
     expect(parsed.schema).toBe(FLEET_JSON_SCHEMA)
     expect(parsed.findings).toEqual([])
+  })
+
+  it("PINNED: `fleet add --yes` REFUSES an entry with no trust rather than defaulting one", async () => {
+    await initRepo("newproj")
+    const manifestPath = await writeHub([])
+    await expect(
+      pExecFile(
+        "node",
+        [CLI, "fleet", "add", path.join(dir, "newproj"), "--yes", "--manifest", manifestPath],
+        {
+          cwd: dir,
+        },
+      ),
+    ).rejects.toThrow(/needs a trust level/)
+    // The refusal must leave the manifest untouched — a rejected registration writes nothing.
+    const after = JSON.parse(await fs.readFile(manifestPath, "utf8")) as { projects: unknown[] }
+    expect(after.projects).toEqual([])
+  })
+
+  it("writes a complete entry and preserves the hand-maintained document around it", async () => {
+    await initRepo("newproj")
+    const manifestPath = await writeHub([])
+    // Prose keys the owner maintains by hand must survive the append.
+    const before = JSON.parse(await fs.readFile(manifestPath, "utf8")) as Record<string, unknown>
+    before._readme = "hand-written prose"
+    await fs.writeFile(manifestPath, JSON.stringify(before, null, 2) + "\n")
+
+    await pExecFile(
+      "node",
+      [
+        CLI,
+        "fleet",
+        "add",
+        path.join(dir, "newproj"),
+        "--yes",
+        "--trust",
+        "private",
+        "--manifest",
+        manifestPath,
+      ],
+      { cwd: dir },
+    )
+    const after = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
+      _readme: string
+      projects: { name: string; trust: string }[]
+    }
+    expect(after._readme).toBe("hand-written prose")
+    expect(after.projects).toHaveLength(1)
+    expect(after.projects[0]).toMatchObject({ name: "newproj", trust: "private" })
+  })
+
+  it("rejects an unknown trust value and a duplicate name", async () => {
+    await initRepo("dup")
+    await initRepo("fresh")
+    const manifestPath = await writeHub([personal("dup")])
+    // `fresh` is unregistered, so this exercises the trust vocabulary rather than the dup guard.
+    await expect(
+      pExecFile(
+        "node",
+        [
+          CLI,
+          "fleet",
+          "add",
+          path.join(dir, "fresh"),
+          "--yes",
+          "--trust",
+          "pubic-repo",
+          "--manifest",
+          manifestPath,
+        ],
+        { cwd: dir },
+      ),
+    ).rejects.toThrow(/--trust must be one of/)
+    await expect(
+      pExecFile(
+        "node",
+        [
+          CLI,
+          "fleet",
+          "add",
+          path.join(dir, "dup"),
+          "--yes",
+          "--trust",
+          "private",
+          "--manifest",
+          manifestPath,
+        ],
+        { cwd: dir },
+      ),
+    ).rejects.toThrow(/already registered/)
   })
 })
 

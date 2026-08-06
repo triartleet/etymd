@@ -128,9 +128,55 @@ ${
 `
 }
 
+/**
+ * The content screen is DECLARED here and RESOLVED at run time from an external checker, which
+ * is what lets a generated hook be committed to a public repo safely: the hook holds no
+ * patterns, and a machine without a checker installed runs a no-op instead of failing.
+ *
+ * The indirection is the whole design. Screening patterns are the very strings being screened
+ * for (employer names, hostnames, identities), so they can never live in a tracked file — the
+ * hook names an executable, and the executable reads the pattern file. Etymd ships the screener
+ * (`etymd screen`) but never ships patterns: the mechanism is general, the policy is the user's.
+ */
+const CONTENT_GATE_RESOLUTION = `GATE="\${CONTENT_GATE:-$(command -v etymd || true)}"`
+
 export function generatePreCommitHook(): string {
   return `#!/usr/bin/env sh
 # etymd: process gate. Cheap, locally-knowable checks belong here (fast, blocks the commit).
+
+# Content screen — staged file bytes. Refuses to commit environment, employer or identity
+# detail into a repo whose history is (or could become) public. The checker and its patterns
+# are machine-local by design, so this is a NO-OP wherever no checker is installed: safe to
+# commit anywhere, active only where you opted in.
+#
+# Bypass, with a reason: git commit --no-verify
+${CONTENT_GATE_RESOLUTION}
+if [ -x "$GATE" ]; then
+  "$GATE" screen --staged || exit 1
+fi
+
+exit 0
+`
+}
+
+/**
+ * The message is published history too, and the staged screen cannot see it: that gate reads
+ * `git diff --cached`, which is file bytes only. A real audit found several leaks living in
+ * commit messages rather than files, which is why this is its own door.
+ */
+export function generateCommitMsgHook(): string {
+  return `#!/usr/bin/env sh
+# etymd: content screen — the commit message itself.
+#
+# The staged-content gate reads file bytes and never sees the message, yet a message is as
+# permanently published as any file. No-op where no checker is installed.
+#
+# Bypass, with a reason: git commit --no-verify
+GATE="\${COMMIT_MSG_GATE:-$(command -v etymd || true)}"
+if [ -x "$GATE" ]; then
+  "$GATE" screen --message "$1" || exit 1
+fi
+
 exit 0
 `
 }
@@ -148,5 +194,56 @@ export function generatePrePushHook(facts: ProjectFacts): string {
   return `#!/usr/bin/env sh
 # etymd: correctness gate. Mirrors CI cheapest-first; blocks the push on any failure.
 ${body}
+
+# Content screen, second pass — the WHOLE TREE rather than one diff. Catches anything committed
+# with --no-verify and anything a rebase or merge brought in from elsewhere. Advisory here (it
+# never blocks the push): the blocking decision belongs at commit time, where the fix is cheap.
+${CONTENT_GATE_RESOLUTION}
+if [ -x "$GATE" ] && [ "\${CONTENT_GATE_PREPUSH:-1}" = "1" ]; then
+  "$GATE" screen --tree --advisory || true
+fi
+
+exit 0
+`
+}
+
+/**
+ * The publish door — the only check that inspects what actually SHIPS.
+ *
+ * Every git-scoped check answers "what is in the repository?". That question misses the leak
+ * that reaches users: a gitignored file can be packaged into a published artifact (npm and vsce
+ * do not honour .gitignore), so every git-based gate passes forever while the bytes go out.
+ * This builds what the project would publish, unpacks it, and screens the result.
+ */
+export function generateArtifactCheckScript(): string {
+  return `#!/usr/bin/env sh
+# etymd: content screen — the published ARTIFACT, not the repository.
+#
+# Wire it into the irreversible moment:
+#   package.json → "prepublishOnly": "./scripts/artifact-check.sh"
+#
+# No-op where no checker is installed. Bypass is deliberate and loud: ARTIFACT_CHECK_SKIP=1.
+set -eu
+
+if [ "\${ARTIFACT_CHECK_SKIP:-0}" = "1" ]; then
+  echo "› artifact-check: SKIPPED by ARTIFACT_CHECK_SKIP=1"
+  exit 0
+fi
+
+${CONTENT_GATE_RESOLUTION}
+[ -x "$GATE" ] || { echo "› artifact-check: no checker installed — skipping."; exit 0; }
+
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT INT TERM
+
+# Pack exactly what would ship, then screen the unpacked bytes.
+if [ -f package.json ]; then
+  npm pack --pack-destination "$WORK" >/dev/null 2>&1 || {
+    echo "› artifact-check: npm pack failed — cannot verify what would ship" >&2; exit 1; }
+  tar -xzf "$WORK"/*.tgz -C "$WORK" 2>/dev/null || true
+fi
+
+"$GATE" screen --dir "$WORK" || exit 1
+exit 0
 `
 }

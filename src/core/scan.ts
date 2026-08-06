@@ -173,6 +173,7 @@ export async function scanProject(root: string, opts: ScanOptions = {}): Promise
     commands: classifyCommands(rootPkg?.scripts),
     ci,
     hooks,
+    publishable: Boolean(rootPkg) && rootPkg?.private !== true,
     artifacts,
     freshness,
     tree,

@@ -6,6 +6,7 @@ import { promisify } from "node:util"
 import { DEFAULT_CONFIG, type StateBudgets } from "../core/config.js"
 import { ETYMD_DIR } from "../core/facts.js"
 import type { FleetEntry, FleetManifest } from "../core/fleet.js"
+import { FLEET_TRUST_VALUES } from "../core/fleet.js"
 import { git, isDirectory, pathExists, readText } from "../core/util.js"
 import type { Finding, FindingTier, LensKind } from "./finding.js"
 import { readLedger } from "./ledger.js"
@@ -272,6 +273,26 @@ export async function checkManifest(
     }
     seen.add(entry.name)
 
+    // Trust is a SAFETY PREDICATE gating content screening, so "unanswered" must never collapse
+    // into the permissive answer. Corp entries are exempt: `profile: "corp"` already implies it.
+    // The declared-but-unknown case is separated from the undeclared one — a typo silently
+    // reading as "no screening" is the failure this pair of findings exists to prevent.
+    if (entry.profile !== "corp" && !entry.private && !entry.trust) {
+      const bad = entry.trustRaw
+      findings.push(
+        finding(
+          `${FLEET_LENS}/${bad ? "unknown-trust" : "undeclared-trust"}:${entry.name}`,
+          "risk",
+          bad
+            ? `\`${entry.name}\` declares unknown trust \`${bad}\``
+            : `\`${entry.name}\` declares no \`trust\``,
+          [`${manifestFile}: ${entry.name}${bad ? `.trust = ${bad}` : " has no trust field"}`],
+          "Trust decides whether content screening applies. An unanswered entry is not a private one — publishing exposes ALL history, so a repo that went public without ever answering is exactly what a default would hide.",
+          `Declare one of ${FLEET_TRUST_VALUES.map((t) => `\`${t}\``).join(", ")}.`,
+        ),
+      )
+    }
+
     if (entry.private && entry.path) {
       findings.push(
         finding(
@@ -334,6 +355,22 @@ export async function checkManifest(
         )
       }
     }
+  }
+
+  // The orientation root is declared once, fleet-wide, and every other entry is guided by it
+  // implicitly — so the only thing to verify is that the declared name actually resolves. A
+  // dangling root would silently orient the whole fleet at nothing.
+  if (manifest.orientation && !seen.has(manifest.orientation.root)) {
+    findings.push(
+      finding(
+        `${FLEET_LENS}/dangling-orientation:${manifest.orientation.root}`,
+        "gap",
+        `\`orientation.root\` names \`${manifest.orientation.root}\`, which is not a registered name`,
+        [`${manifestFile}: orientation.root = ${manifest.orientation.root}`],
+        "Every entry is guided by the orientation root implicitly — if it resolves to nothing, the whole fleet's orientation is a claim nothing can follow.",
+        "Point it at a registered name, or drop the block if this fleet has no orientation root.",
+      ),
+    )
   }
 
   // Orphaned local mappings: a dirs key for a name the registry no longer carries.

@@ -1,9 +1,17 @@
+import path from "node:path"
+
 import { cancel, confirm, isCancel } from "@clack/prompts"
 
 import { applyFiles } from "../core/apply.js"
 import { planWorkflow } from "../core/generate.js"
+import { ensurePackageScript } from "../core/merge-json.js"
 import { scanProject } from "../core/scan.js"
 import { git } from "../core/util.js"
+
+/** The publish door: the script etymd owns, and the one package.json key that fires it. */
+const PUBLISH_GATE_SCRIPT = "scripts/artifact-check.sh"
+const PUBLISH_GATE_KEY = "prepublishOnly"
+const PUBLISH_GATE_VALUE = `./${PUBLISH_GATE_SCRIPT}`
 import { print, renderPlan, section } from "../ui/render.js"
 import { glyph, theme } from "../ui/theme.js"
 
@@ -86,4 +94,37 @@ export async function run(opts: GatesOptions): Promise<void> {
   for (const sk of result.skipped)
     print(`  ${glyph.bullet} ${theme.dim("kept (hand-edited)")} ${theme.dim(sk)}`)
   print(`  ${glyph.ok} ${theme.dim("set")} ${theme.code("core.hooksPath = .githooks")}`)
+
+  // The publish door needs one line in package.json to fire. Etymd writes it only on an
+  // explicit yes: package.json is the user's file, and every other gate here is a file etymd
+  // owns outright. Declining leaves a working script they can wire by hand.
+  const wrotePublishGate = result.written.includes(PUBLISH_GATE_SCRIPT)
+  if (wrotePublishGate) {
+    const pkgPath = path.join(opts.cwd, "package.json")
+    const wire =
+      opts.yes ||
+      (await confirm({
+        message: `Add "${PUBLISH_GATE_KEY}": "${PUBLISH_GATE_VALUE}" to package.json? (screens what actually ships)`,
+        initialValue: true,
+      }).then((v) => (isCancel(v) ? false : v)))
+    if (wire) {
+      const merged = await ensurePackageScript(pkgPath, PUBLISH_GATE_KEY, PUBLISH_GATE_VALUE)
+      if (merged.outcome === "added")
+        print(`  ${glyph.ok} ${theme.dim("wired")} ${theme.code(PUBLISH_GATE_KEY)}`)
+      else if (merged.outcome === "conflict")
+        print(
+          `  ${glyph.partial} ${theme.warn(`${PUBLISH_GATE_KEY} already runs \`${merged.existing}\``)} ${theme.dim("— left as is; chain the screen into it by hand if you want both.")}`,
+        )
+      else if (merged.outcome === "unchanged")
+        print(`  ${glyph.bullet} ${theme.dim(`${PUBLISH_GATE_KEY} already wired`)}`)
+      else
+        print(
+          `  ${glyph.partial} ${theme.dim(`package.json ${merged.outcome}${merged.detail ? `: ${merged.detail}` : ""} — wire ${PUBLISH_GATE_KEY} by hand`)}`,
+        )
+    } else {
+      print(
+        `  ${glyph.bullet} ${theme.dim(`not wired — add "${PUBLISH_GATE_KEY}": "${PUBLISH_GATE_VALUE}" when you want the publish door active`)}`,
+      )
+    }
+  }
 }

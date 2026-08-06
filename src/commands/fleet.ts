@@ -1,8 +1,16 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
-import { loadFleetManifest, type FleetManifest } from "../core/fleet.js"
-import { pathExists, readText } from "../core/util.js"
+import { cancel, confirm, isCancel, select, text } from "@clack/prompts"
+
+import {
+  FLEET_TRUST_VALUES,
+  isFleetTrust,
+  loadFleetManifest,
+  type FleetManifest,
+} from "../core/fleet.js"
+import { scanProject } from "../core/scan.js"
+import { git, pathExists, readText } from "../core/util.js"
 import { meetsFailOn, parseFailOnTier, type Finding, type FindingTier } from "../engine/finding.js"
 import {
   checkManifest,
@@ -289,6 +297,195 @@ export async function check(opts: FleetCheckCmdOptions): Promise<void> {
   )
   renderFindings(findings)
   renderFleetNotes([], disclosures)
+}
+
+// ---------------------------------------------------------------------------------------------
+// etymd fleet add — the registration gate
+// ---------------------------------------------------------------------------------------------
+
+export interface FleetAddCmdOptions {
+  cwd: string
+  manifest?: string
+  /** Directory of the project to register. */
+  target: string
+  name?: string
+  kind?: string
+  profile?: string
+  trust?: string
+  yes?: boolean
+}
+
+/**
+ * Register a project, refusing to write an entry that is missing a mandatory field.
+ *
+ * The gate is the point: a manifest entry is the fleet's claim about a project, and the fields
+ * a scanner CANNOT derive — `trust` above all — are exactly the ones that get forgotten when
+ * registration is a hand-edit. Prompting at the moment of mutation is what makes the mandatory
+ * set true by construction instead of true by remembering. Non-interactive runs (`--yes`, CI)
+ * must pass every mandatory value as a flag; a missing one is an error, never a default.
+ */
+export async function add(opts: FleetAddCmdOptions): Promise<void> {
+  const { manifest, autoNote } = await loadManifest(opts.cwd, opts.manifest)
+  if (autoNote) print(`  ${theme.dim(`◦ ${autoNote}`)}`)
+  if (manifest.shape !== "registry") {
+    throw new Error("`fleet add` targets the registry shape — this manifest is a legacy corpus")
+  }
+  const raw = await readText(manifest.manifestPath)
+  if (raw === null) throw new Error(`cannot read ${manifest.manifestPath}`)
+
+  const absTarget = path.resolve(opts.cwd, opts.target)
+  if (!(await pathExists(absTarget))) throw new Error(`no such directory: ${absTarget}`)
+  const name = opts.name ?? path.basename(absTarget)
+  if (manifest.entries.some((e) => e.name === name)) {
+    throw new Error(`\`${name}\` is already registered — resolution is keyed by name`)
+  }
+
+  const facts = await scanProject(absTarget)
+  // A remote IS derivable — read it, never ask. The fields below are not, so they are asked.
+  const remote = facts.git.isRepo ? await git(absTarget, ["remote", "get-url", "origin"]) : null
+
+  section(`Fleet add ${theme.dim(`· ${name} · ${absTarget}`)}`)
+
+  // `profile` decides which side of the wall an entry lives on — a placement decision, not a
+  // repo fact. Defaulting it silently would let a corp repo land as personal, so it is asked
+  // (the flag answers it for non-interactive runs; personal stays the pre-selected default).
+  let profile = opts.profile
+  if (!profile && !opts.yes) {
+    const picked = await select({
+      message: "Which side of the wall does this belong to?",
+      initialValue: "personal",
+      options: [
+        { value: "personal", label: "personal — your own work" },
+        { value: "corp", label: "corp — employer work (alias-only, machine-pinned)" },
+      ],
+    })
+    if (isCancel(picked)) {
+      cancel("No entry written.")
+      return
+    }
+    profile = picked as string
+  }
+  profile = profile ?? "personal"
+  if (profile !== "personal" && profile !== "corp") {
+    throw new Error(`--profile must be personal or corp, got \`${profile}\``)
+  }
+
+  // `kind` is deliberately a FREE string, not a vocabulary: a fleet's categories are its own,
+  // and constraining them would make a general tool impose one owner's taxonomy. The scan can
+  // only tell tool-shaped from repo-shaped, so that guess seeds the prompt and the kinds
+  // already used in this manifest are offered beside it — the fleet's vocabulary reinforces
+  // itself without ever being hardcoded.
+  const derivedKind = facts.commands.build || facts.commands.test ? "tool" : "repo"
+  let kind = opts.kind
+  if (!kind && !opts.yes) {
+    const known = [...new Set(manifest.entries.map((e) => e.kind).filter(Boolean))] as string[]
+    const choices = [...new Set([derivedKind, ...known])]
+    const picked = await select({
+      message: "Kind?",
+      initialValue: derivedKind,
+      options: [
+        ...choices.map((k) => ({
+          value: k,
+          label: k === derivedKind ? `${k} — matches this repo's shape` : k,
+        })),
+        { value: "", label: "something else…" },
+      ],
+    })
+    if (isCancel(picked)) {
+      cancel("No entry written.")
+      return
+    }
+    kind = picked as string
+    if (!kind) {
+      const typed = await text({
+        message: "Kind (free text):",
+        validate: (v) => (v.trim() ? undefined : "a kind is required"),
+      })
+      if (isCancel(typed)) {
+        cancel("No entry written.")
+        return
+      }
+      kind = (typed as string).trim()
+    }
+  }
+  kind = kind ?? derivedKind
+
+  // Corp entries take their answer from the profile (machine-pinned, never publishable), so the
+  // predicate is only asked of the entries it actually gates.
+  let trust: string | undefined
+  if (profile === "personal") {
+    trust = opts.trust
+    if (!trust && !opts.yes) {
+      const picked = await select({
+        message: "How exposed is this repo's history? (gates content screening)",
+        options: [
+          { value: "private", label: "private — not destined to be published" },
+          { value: "public-bound", label: "public-bound — private now, plausibly public later" },
+          { value: "public-repo", label: "public-repo — already public" },
+        ],
+      })
+      if (isCancel(picked)) {
+        cancel("No entry written.")
+        return
+      }
+      trust = picked as string
+    }
+    if (!trust) {
+      throw new Error(
+        `\`${name}\` needs a trust level: pass --trust <${FLEET_TRUST_VALUES.join("|")}> (non-interactive runs cannot be prompted, and there is deliberately no default — trust gates content screening)`,
+      )
+    }
+    if (!isFleetTrust(trust)) {
+      throw new Error(`--trust must be one of ${FLEET_TRUST_VALUES.join(", ")}, got \`${trust}\``)
+    }
+  } else if (opts.trust) {
+    throw new Error("corp entries take no `trust` — `profile: corp` already implies it")
+  }
+
+  const entry: Record<string, unknown> =
+    profile === "corp"
+      ? { name, kind, profile, private: true }
+      : {
+          name,
+          kind,
+          profile,
+          path: path.relative(manifest.root ?? manifest.dir, absTarget),
+          trust,
+          contract: {},
+          links: {},
+          // The scan does not collect remotes (they are not a workflow fact), so read it here —
+          // recorded when present, simply absent when the repo has no origin yet.
+          ...(remote ? { remote } : {}),
+        }
+
+  print(`  ${glyph.bullet} ${theme.dim("entry")}`)
+  print(
+    JSON.stringify(entry, null, 2)
+      .split("\n")
+      .map((l) => `    ${theme.dim(l)}`)
+      .join("\n"),
+  )
+
+  if (!opts.yes) {
+    const ok = await confirm({
+      message: `Write this entry to ${path.basename(manifest.manifestPath)}?`,
+    })
+    if (isCancel(ok) || !ok) {
+      cancel("No entry written.")
+      return
+    }
+  }
+
+  // Append into the existing `projects` array by re-serializing the parsed document: the
+  // manifest is hand-maintained and carries `_readme`/`_note` prose that a naive rewrite would
+  // drop, so key order is preserved by mutating the parsed object rather than rebuilding it.
+  const doc = JSON.parse(raw) as Record<string, unknown>
+  if (!Array.isArray(doc.projects)) throw new Error("manifest has no `projects` array to append to")
+  doc.projects.push(entry)
+  await fs.writeFile(manifest.manifestPath, JSON.stringify(doc, null, 2) + "\n", "utf8")
+
+  print(`  ${glyph.ok} ${theme.dim("registered")} ${theme.info(name)}`)
+  print(`  ${theme.dim(`verify with \`etymd fleet check --manifest ${manifest.manifestPath}\``)}`)
 }
 
 // ---------------------------------------------------------------------------------------------

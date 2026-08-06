@@ -1,6 +1,12 @@
 import path from "node:path"
 
-import { generateAgentsMd, generatePreCommitHook, generatePrePushHook } from "../pack/templates.js"
+import {
+  generateAgentsMd,
+  generateArtifactCheckScript,
+  generateCommitMsgHook,
+  generatePreCommitHook,
+  generatePrePushHook,
+} from "../pack/templates.js"
 import type { ProjectFacts } from "./types.js"
 import { pathExists, readText } from "./util.js"
 
@@ -20,6 +26,12 @@ export interface PlanOptions {
   /** Scaffold a minimal AGENTS.md (init only offers this when none exists). */
   agents: boolean
   gates: boolean
+  /**
+   * Emit the publish-time screen. Defaults to `facts.publishable` — set it explicitly to
+   * override the derivation (a repo that publishes by a route npm cannot see, or one that
+   * declines the door).
+   */
+  publishGate?: boolean
 }
 
 /** Build the file set an onboarding would write, flagging which exist and which differ. */
@@ -48,7 +60,24 @@ export async function planWorkflow(
   }
   if (opts.gates) {
     await add(".githooks/pre-commit", generatePreCommitHook(), "Process gate (pre-commit)", true)
+    await add(
+      ".githooks/commit-msg",
+      generateCommitMsgHook(),
+      "Content screen (commit message)",
+      true,
+    )
     await add(".githooks/pre-push", generatePrePushHook(facts), "Correctness gate (pre-push)", true)
+    // The publish door is only meaningful where something is actually published — offering it
+    // to a private app or a docs repo would be noise. `private: true` is npm's own declaration
+    // that this package is never published, so it is the honest signal to key on.
+    if (opts.publishGate ?? facts.publishable) {
+      await add(
+        "scripts/artifact-check.sh",
+        generateArtifactCheckScript(),
+        "Content screen (published artifact)",
+        true,
+      )
+    }
   }
 
   return out
