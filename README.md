@@ -216,6 +216,11 @@ Every key is optional; omit the file entirely and the defaults below apply.
     "failOn": "risk", // audit tier that fails the push: risk | gap | polish
     "publishGate": true, // screen the published artifact
     "allowWriting": [], // commands allowed into a gate despite writing
+    // Why a value here is what it is. Each key mirrors the field it explains, so the
+    // note says what it refers to instead of sitting near it and hoping. Etymd keeps
+    // these, and DROPS one whose field it changes — a reason attached to a value it no
+    // longer explains is worse than no reason at all.
+    "_why": { "failOn": "no build and no tests here; only docs drift can fire" },
   },
 }
 ```

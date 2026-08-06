@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { derivedCommands } from "../src/commands/gates.js"
+import { derivedCommands, mergeGateSection } from "../src/commands/gates.js"
 import { planWorkflow } from "../src/core/generate.js"
 import { isDriftEmpty, summarizeBaselineDrift } from "../src/core/facts.js"
 import type { ProjectFacts } from "../src/core/types.js"
@@ -276,5 +276,47 @@ describe("summarizeBaselineDrift", () => {
     expect(drift.dirsAdded).toEqual(["docs"])
     expect(drift.dirsRemoved).toEqual([])
     expect(isDriftEmpty(drift)).toBe(false)
+  })
+})
+
+describe("gate config _why annotations", () => {
+  const gates = {
+    commands: ["typecheck"],
+    failOn: "risk",
+    publishGate: false,
+    allowWriting: [],
+  }
+
+  it("keeps a _why whose field this run did not change", () => {
+    const merged = mergeGateSection(
+      { commands: ["typecheck"], failOn: "risk", _why: { commands: "lint is CI-only here" } },
+      gates,
+    )
+    expect((merged._why as Record<string, string>).commands).toBe("lint is CI-only here")
+  })
+
+  it("PINNED: drops a _why whose field this run changed — a stale reason misleads", () => {
+    // Structured prose reads as more trustworthy than a shell comment, so an explanation left
+    // attached to a value it no longer explains is worse than having none.
+    const merged = mergeGateSection({ failOn: "gap", _why: { failOn: "no tests here" } }, gates)
+    expect(merged.failOn).toBe("risk")
+    expect(merged._why).toBeUndefined()
+  })
+
+  it("drops only the stale entries, keeping the rest", () => {
+    const merged = mergeGateSection(
+      {
+        failOn: "gap",
+        commands: ["typecheck"],
+        _why: { failOn: "no tests here", commands: "lint is CI-only" },
+      },
+      gates,
+    )
+    expect(merged._why).toEqual({ commands: "lint is CI-only" })
+  })
+
+  it("preserves unknown keys etymd does not define", () => {
+    const merged = mergeGateSection({ _note: "hand-written", failOn: "risk" }, gates)
+    expect(merged._note).toBe("hand-written")
   })
 })

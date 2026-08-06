@@ -132,6 +132,39 @@ async function customize(
   }
 }
 
+/**
+ * Merge recorded gate choices into the user's existing `gates` section.
+ *
+ * Two properties, both about a file etymd does not own outright:
+ *
+ * Keys etymd does not define survive — notably `_why`, where the reason for a non-default value
+ * lives beside the value it explains. The reference is structural rather than a naming
+ * convention: `gates._why.failOn` mirrors `gates.failOn`, so it says what it refers to without
+ * anyone having to infer it from a prefix, and it extends to any field without inventing a name.
+ *
+ * But an explanation of a value that just CHANGED is not an explanation any more. A stale note in
+ * structured form is worse than the shell comment this replaces, because structure reads as
+ * trustworthy — so an entry whose field this run changed is dropped rather than left to mislead.
+ */
+export function mergeGateSection(
+  previous: Record<string, unknown>,
+  gates: GateConfig,
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...previous, ...gates }
+  const why = previous._why as Record<string, unknown> | undefined
+  if (!why) return merged
+
+  const next = gates as unknown as Record<string, unknown>
+  const kept = Object.fromEntries(
+    Object.entries(why).filter(
+      ([field]) => JSON.stringify(previous[field]) === JSON.stringify(next[field]),
+    ),
+  )
+  if (Object.keys(kept).length) merged._why = kept
+  else delete merged._why
+  return merged
+}
+
 async function writeGateConfig(root: string, gates: GateConfig): Promise<void> {
   const target = configPath(root)
   const existing = await readText(target)
@@ -144,7 +177,7 @@ async function writeGateConfig(root: string, gates: GateConfig): Promise<void> {
       return
     }
   }
-  doc.gates = gates
+  doc.gates = mergeGateSection((doc.gates as Record<string, unknown>) ?? {}, gates)
   await fs.mkdir(path.dirname(target), { recursive: true })
   await fs.writeFile(target, JSON.stringify(doc, null, 2) + "\n", "utf8")
 }
