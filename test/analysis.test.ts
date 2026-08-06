@@ -140,6 +140,46 @@ describe("planWorkflow", () => {
     expect(forcedOff.map((p) => p.path)).not.toContain("scripts/artifact-check.sh")
   })
 
+  it("a recorded gate config wins over the derivation", async () => {
+    // The scan's guess is a starting point; the one edit that changes it must survive the next
+    // `etymd gates` run, or the tool argues with the user every time.
+    const plan = await planWorkflow("/nonexistent-root", facts({ publishable: true }), {
+      agents: false,
+      gates: true,
+      gateConfig: {
+        commands: ["typecheck"],
+        failOn: "gap",
+        publishGate: false,
+        allowWriting: [],
+      },
+    })
+    expect(plan.map((p) => p.path)).not.toContain("scripts/artifact-check.sh")
+    const prePush = plan.find((p) => p.path === ".githooks/pre-push")?.contents ?? ""
+    expect(prePush).toContain("typecheck")
+    expect(prePush).not.toContain("lint")
+    expect(prePush).toContain("--fail-on gap")
+  })
+
+  it("honours an explicit allowWriting override for a command that would otherwise be refused", () => {
+    // isSafeGateCommand is an opinion, not a law: picking a writing command IS the override.
+    const f = facts({
+      commands: { raw: { "lint:fix": "eslint --fix" }, lint: "lint:fix" },
+    })
+    const withoutOverride = generatePrePushHook(f, {
+      commands: ["lint:fix"],
+      failOn: "risk",
+      allowWriting: [],
+    })
+    expect(withoutOverride).not.toContain("lint:fix")
+
+    const withOverride = generatePrePushHook(f, {
+      commands: ["lint:fix"],
+      failOn: "risk",
+      allowWriting: ["lint:fix"],
+    })
+    expect(withOverride).toContain("lint:fix")
+  })
+
   it("PINNED: every generated gate is inert without a checker — safe to commit to a public repo", () => {
     // The hooks carry no patterns and no policy: they resolve an external checker and no-op
     // when it is absent. This is what lets the same file be committed anywhere.

@@ -1,3 +1,4 @@
+import type { GateConfig } from "../core/config.js"
 import type { PackageManager, ProjectFacts } from "../core/types.js"
 import { PACK_VERSION } from "./version.js"
 
@@ -181,19 +182,37 @@ exit 0
 `
 }
 
-export function generatePrePushHook(facts: ProjectFacts): string {
+export function generatePrePushHook(facts: ProjectFacts, gates?: GateConfig): string {
   const run = runPrefix(facts.packageManager)
   const c = facts.commands
-  const candidates = [c.formatCheck, c.typecheck, c.lint]
+  // A recorded command set wins over the derivation: the guess is a starting point, and the one
+  // edit that changes it must survive the next `etymd gates` run.
+  const candidates = gates?.commands.length ? gates.commands : [c.formatCheck, c.typecheck, c.lint]
+  const allowed = new Set(gates?.allowWriting ?? [])
   const steps = candidates
-    .filter((key): key is string => Boolean(key) && isSafeGateCommand(c.raw[key as string]))
+    .filter(
+      (key): key is string =>
+        Boolean(key) && (allowed.has(key as string) || isSafeGateCommand(c.raw[key as string])),
+    )
     .map((key) => `${run} ${key}`)
   const body = steps.length
     ? steps.map((s) => `echo "› ${s}"\n${s} || exit 1`).join("\n")
     : 'echo "etymd: no correctness commands detected — add format:check / typecheck / lint"'
+  // The truth gate on the repo's own instructions, at the tier this repo chose. Skipped with a
+  // note rather than failing where etymd is not installed — a gate that cannot run must say so
+  // instead of silently passing.
+  const failOn = gates?.failOn ?? "risk"
+  const auditStep = `
+if command -v etymd >/dev/null 2>&1; then
+  echo "› etymd audit --fail-on ${failOn}"
+  etymd audit --no-ledger --fail-on ${failOn} || exit 1
+else
+  echo "› etymd audit skipped (not on PATH)"
+fi`
   return `#!/usr/bin/env sh
 # etymd: correctness gate. Mirrors CI cheapest-first; blocks the push on any failure.
 ${body}
+${auditStep}
 
 # Content screen, second pass — the WHOLE TREE rather than one diff. Catches anything committed
 # with --no-verify and anything a rebase or merge brought in from elsewhere. Advisory here (it

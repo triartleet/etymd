@@ -208,6 +208,15 @@ Every key is optional; omit the file entirely and the defaults below apply.
     "perFileWords": 4000, // extraction candidate above this
     "totalWords": 8000, // always-loaded footprint budget
   },
+  "gates": {
+    // What `etymd gates` generates. Written for you on first run from what the scan
+    // finds — edit it here rather than editing the generated hook, so the next run
+    // agrees with you instead of arguing.
+    "commands": ["typecheck", "lint"], // pre-push steps, in order
+    "failOn": "risk", // audit tier that fails the push: risk | gap | polish
+    "publishGate": true, // screen the published artifact
+    "allowWriting": [], // commands allowed into a gate despite writing
+  },
 }
 ```
 

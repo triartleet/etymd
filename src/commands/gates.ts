@@ -1,12 +1,16 @@
+import { promises as fs } from "node:fs"
 import path from "node:path"
 
-import { cancel, confirm, isCancel } from "@clack/prompts"
+import { cancel, confirm, isCancel, multiselect, select } from "@clack/prompts"
 
 import { applyFiles } from "../core/apply.js"
+import { CONFIG_FILE, configPath, readConfig, type GateConfig } from "../core/config.js"
 import { planWorkflow } from "../core/generate.js"
 import { ensurePackageScript } from "../core/merge-json.js"
 import { scanProject } from "../core/scan.js"
-import { git } from "../core/util.js"
+import type { ProjectFacts } from "../core/types.js"
+import { git, readText } from "../core/util.js"
+import { isSafeGateCommand, runPrefix } from "../pack/templates.js"
 
 /** The publish door: the script etymd owns, and the one package.json key that fires it. */
 const PUBLISH_GATE_SCRIPT = "scripts/artifact-check.sh"
@@ -19,6 +23,97 @@ export interface GatesOptions {
   cwd: string
   ci?: boolean
   yes?: boolean
+}
+
+/** The scan's opening guess at what a pre-push gate should run. */
+function derivedCommands(facts: ProjectFacts): string[] {
+  const c = facts.commands
+  return [c.formatCheck, c.typecheck, c.lint].filter(
+    (k): k is string => Boolean(k) && isSafeGateCommand(c.raw[k as string]),
+  )
+}
+
+/** Show the derivations in one place, so "accept" is an informed keystroke rather than a guess. */
+function printGateSummary(gates: GateConfig, facts: ProjectFacts): void {
+  const run = runPrefix(facts.packageManager)
+  const cmds = gates.commands.length
+    ? gates.commands.map((c) => `${run} ${c}`).join(", ")
+    : "none detected"
+  print(`  ${glyph.bullet} ${theme.dim("pre-push runs")} ${theme.info(cmds)}`)
+  print(`  ${glyph.bullet} ${theme.dim("audit fails on")} ${theme.info(gates.failOn)}`)
+  print(
+    `  ${glyph.bullet} ${theme.dim("publish screen")} ${theme.info(gates.publishGate ? "yes" : "no")}${
+      gates.publishGate && !facts.publishable ? theme.dim(" (overridden)") : ""
+    }`,
+  )
+  print(`  ${theme.dim(`change any of these later in ${CONFIG_FILE}`)}`)
+}
+
+/** The escape hatch behind "customize" — the same choices, for the person who wants them. */
+async function customize(
+  current: GateConfig,
+  facts: ProjectFacts,
+): Promise<GateConfig | undefined> {
+  const c = facts.commands
+  const available = [c.formatCheck, c.typecheck, c.lint, c.test].filter((k): k is string =>
+    Boolean(k),
+  )
+  const picked = available.length
+    ? await multiselect({
+        message: "Which commands should the pre-push gate run?",
+        required: false,
+        initialValues: current.commands,
+        options: available.map((k) => ({
+          value: k,
+          label: `${runPrefix(facts.packageManager)} ${k}`,
+          hint: isSafeGateCommand(c.raw[k]) ? undefined : "writes — allowed only if you pick it",
+        })),
+      })
+    : []
+  if (isCancel(picked)) return undefined
+
+  const tier = await select({
+    message: "Fail the push on which finding tier?",
+    initialValue: current.failOn,
+    options: [
+      { value: "risk", label: "risk — only what makes an agent do the wrong thing" },
+      { value: "gap", label: "gap — also dead references and missing safeguards" },
+      { value: "polish", label: "polish — everything" },
+    ],
+  })
+  if (isCancel(tier)) return undefined
+
+  const publish = await confirm({
+    message: "Screen the published artifact? (the only check that sees what actually ships)",
+    initialValue: current.publishGate ?? facts.publishable,
+  })
+  if (isCancel(publish)) return undefined
+
+  const commands = picked as string[]
+  return {
+    commands,
+    failOn: tier as string,
+    publishGate: publish,
+    // Picking a writing command IS the override — recorded so the generator honors it.
+    allowWriting: commands.filter((k) => !isSafeGateCommand(c.raw[k])),
+  }
+}
+
+async function writeGateConfig(root: string, gates: GateConfig): Promise<void> {
+  const target = configPath(root)
+  const existing = await readText(target)
+  let doc: Record<string, unknown> = {}
+  if (existing) {
+    try {
+      doc = JSON.parse(existing) as Record<string, unknown>
+    } catch {
+      // A hand-broken config is the user's to fix; recording over it would destroy their edits.
+      return
+    }
+  }
+  doc.gates = gates
+  await fs.mkdir(path.dirname(target), { recursive: true })
+  await fs.writeFile(target, JSON.stringify(doc, null, 2) + "\n", "utf8")
 }
 
 export async function run(opts: GatesOptions): Promise<void> {
@@ -54,9 +149,57 @@ export async function run(opts: GatesOptions): Promise<void> {
     }
   }
 
-  const files = await planWorkflow(opts.cwd, facts, { agents: false, gates: true })
-  const gateFiles = files.filter((f) => f.executable)
+  // Everything below is DERIVED and shown, not asked. Getting a derivation wrong costs a
+  // slightly slow hook or a slightly strict audit — both one edit away — so the default path is
+  // a single keystroke, and `customize` exists for the person who wants the choices.
+  const { config } = await readConfig(opts.cwd)
+  let gateConfig: GateConfig = {
+    ...config.gates,
+    commands: config.gates.commands.length ? config.gates.commands : derivedCommands(facts),
+    publishGate: config.gates.publishGate ?? facts.publishable,
+  }
+
+  const plan = async () => {
+    const files = await planWorkflow(opts.cwd, facts, {
+      agents: false,
+      gates: true,
+      gateConfig,
+    })
+    return files.filter((f) => f.executable)
+  }
+  let gateFiles = await plan()
   renderPlan(gateFiles)
+  printGateSummary(gateConfig, facts)
+
+  if (!opts.yes) {
+    const choice = await select({
+      message: "Install these gates?",
+      initialValue: "yes",
+      options: [
+        { value: "yes", label: "yes — install as shown" },
+        { value: "customize", label: "customize — change what the gates run" },
+        { value: "no", label: "cancel" },
+      ],
+    })
+    if (isCancel(choice) || choice === "no") {
+      cancel("No changes made.")
+      return
+    }
+    if (choice === "customize") {
+      const customized = await customize(gateConfig, facts)
+      if (!customized) {
+        cancel("No changes made.")
+        return
+      }
+      gateConfig = customized
+      gateFiles = await plan()
+      renderPlan(gateFiles)
+      printGateSummary(gateConfig, facts)
+    }
+    // Choices are recorded so a re-run never re-asks and a drift check has something to
+    // compare against.
+    await writeGateConfig(opts.cwd, gateConfig)
+  }
 
   // A hand-edited hook is never silently clobbered — per-file consent when contents differ.
   const overwrite = new Set<string>()
@@ -78,14 +221,6 @@ export async function run(opts: GatesOptions): Promise<void> {
     if (ow) overwrite.add(f.path)
   }
 
-  if (!opts.yes) {
-    const ok = await confirm({ message: "Install these git hooks and point git at .githooks?" })
-    if (isCancel(ok) || !ok) {
-      cancel("No changes made.")
-      return
-    }
-  }
-
   const result = await applyFiles(opts.cwd, gateFiles, overwrite)
   await git(opts.cwd, ["config", "core.hooksPath", ".githooks"])
 
@@ -95,19 +230,13 @@ export async function run(opts: GatesOptions): Promise<void> {
     print(`  ${glyph.bullet} ${theme.dim("kept (hand-edited)")} ${theme.dim(sk)}`)
   print(`  ${glyph.ok} ${theme.dim("set")} ${theme.code("core.hooksPath = .githooks")}`)
 
-  // The publish door needs one line in package.json to fire. Etymd writes it only on an
-  // explicit yes: package.json is the user's file, and every other gate here is a file etymd
-  // owns outright. Declining leaves a working script they can wire by hand.
+  // The publish door needs one line in package.json to fire. The plan already showed it and the
+  // install was consented to, so this does not ask again — but the merge itself stays
+  // conservative: it refuses to overwrite a publish hook someone else wrote.
   const wrotePublishGate = result.written.includes(PUBLISH_GATE_SCRIPT)
   if (wrotePublishGate) {
     const pkgPath = path.join(opts.cwd, "package.json")
-    const wire =
-      opts.yes ||
-      (await confirm({
-        message: `Add "${PUBLISH_GATE_KEY}": "${PUBLISH_GATE_VALUE}" to package.json? (screens what actually ships)`,
-        initialValue: true,
-      }).then((v) => (isCancel(v) ? false : v)))
-    if (wire) {
+    {
       const merged = await ensurePackageScript(pkgPath, PUBLISH_GATE_KEY, PUBLISH_GATE_VALUE)
       if (merged.outcome === "added")
         print(`  ${glyph.ok} ${theme.dim("wired")} ${theme.code(PUBLISH_GATE_KEY)}`)
@@ -121,10 +250,6 @@ export async function run(opts: GatesOptions): Promise<void> {
         print(
           `  ${glyph.partial} ${theme.dim(`package.json ${merged.outcome}${merged.detail ? `: ${merged.detail}` : ""} — wire ${PUBLISH_GATE_KEY} by hand`)}`,
         )
-    } else {
-      print(
-        `  ${glyph.bullet} ${theme.dim(`not wired — add "${PUBLISH_GATE_KEY}": "${PUBLISH_GATE_VALUE}" when you want the publish door active`)}`,
-      )
     }
   }
 }

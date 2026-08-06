@@ -7,6 +7,7 @@ import {
   generatePreCommitHook,
   generatePrePushHook,
 } from "../pack/templates.js"
+import type { GateConfig } from "./config.js"
 import type { ProjectFacts } from "./types.js"
 import { pathExists, readText } from "./util.js"
 
@@ -32,6 +33,8 @@ export interface PlanOptions {
    * declines the door).
    */
   publishGate?: boolean
+  /** Recorded gate choices; absent means derive everything from the scan. */
+  gateConfig?: GateConfig
 }
 
 /** Build the file set an onboarding would write, flagging which exist and which differ. */
@@ -66,11 +69,17 @@ export async function planWorkflow(
       "Content screen (commit message)",
       true,
     )
-    await add(".githooks/pre-push", generatePrePushHook(facts), "Correctness gate (pre-push)", true)
-    // The publish door is only meaningful where something is actually published — offering it
-    // to a private app or a docs repo would be noise. `private: true` is npm's own declaration
-    // that this package is never published, so it is the honest signal to key on.
-    if (opts.publishGate ?? facts.publishable) {
+    await add(
+      ".githooks/pre-push",
+      generatePrePushHook(facts, opts.gateConfig),
+      "Correctness gate (pre-push)",
+      true,
+    )
+    // The publish door is only meaningful where something actually ships. A recorded answer
+    // wins; otherwise fall back to the derivation. Note the derivation is a GUESS: npm treats a
+    // missing `private` as publishable, which is right about npm's semantics and wrong about a
+    // local fork that will never be published — hence the recorded override.
+    if (opts.gateConfig?.publishGate ?? opts.publishGate ?? facts.publishable) {
       await add(
         "scripts/artifact-check.sh",
         generateArtifactCheckScript(),
