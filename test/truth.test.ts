@@ -75,7 +75,7 @@ describe("claim extraction", () => {
     expect(paths.sort()).toEqual(["docs/design", "src/core/detect.ts"])
   })
 
-  it("treats create-this paths as prospective, not claims (the nanoclaw skill class)", () => {
+  it("treats create-this paths as prospective, not claims (the oss-fork skill class)", () => {
     const { paths, prospective } = extractPathClaims(
       [
         "Create `migrations/quarantine/` before starting the move.",

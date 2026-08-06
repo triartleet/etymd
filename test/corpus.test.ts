@@ -155,27 +155,24 @@ describe.skipIf(!hasRepo("docs-only"))("corpus: docs-only (no manifest)", () => 
   })
 })
 
-describe.skipIf(!hasRepo("nanoclaw-v2"))(
-  "corpus: nanoclaw-v2 (large fork, symlinked contract)",
-  () => {
-    it("scans the fork: pnpm, husky hooks, AGENTS.md symlink counts as a contract", async () => {
-      const facts = await scanProject(repo("nanoclaw-v2"))
-      expect(facts.packageManager).toBe("pnpm")
-      expect(facts.hooks.source).toBe("husky")
-      expect(facts.artifacts.find((a) => a.id === "agents")?.exists).toBe(true)
-    })
+describe.skipIf(!hasRepo("oss-fork"))("corpus: oss-fork (large fork, symlinked contract)", () => {
+  it("scans the fork: pnpm, husky hooks, AGENTS.md symlink counts as a contract", async () => {
+    const facts = await scanProject(repo("oss-fork"))
+    expect(facts.packageManager).toBe("pnpm")
+    expect(facts.hooks.source).toBe("husky")
+    expect(facts.artifacts.find((a) => a.id === "agents")?.exists).toBe(true)
+  })
 
-    it("truth lens survives the 29KB claim-rich CLAUDE.md read-only", async () => {
-      const root = repo("nanoclaw-v2")
-      const facts = await scanProject(root)
-      const report = await instructionTruthLens.run({
-        root,
-        facts,
-        profile: "solo",
-        baseline: null,
-      })
-      expect(report.status).toBe("ran")
-      for (const f of report.findings) expect(f.evidence.length).toBeGreaterThan(0)
+  it("truth lens survives the 29KB claim-rich CLAUDE.md read-only", async () => {
+    const root = repo("oss-fork")
+    const facts = await scanProject(root)
+    const report = await instructionTruthLens.run({
+      root,
+      facts,
+      profile: "solo",
+      baseline: null,
     })
-  },
-)
+    expect(report.status).toBe("ran")
+    for (const f of report.findings) expect(f.evidence.length).toBeGreaterThan(0)
+  })
+})

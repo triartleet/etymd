@@ -211,7 +211,7 @@ const KNOWN_EXTENSIONS = new Set([
 ])
 
 // A path the surrounding prose tells the agent to CREATE is not a stale reference — it is a
-// forward-looking instruction, and the repo is right to lack it. Harvested from the nanoclaw-v2
+// forward-looking instruction, and the repo is right to lack it. Harvested from the oss-fork
 // first audit (migration quarantine dirs, generated outputs), the second new skip class after
 // Better-Auth dotted notation.
 const CREATION_CONTEXT_RE =

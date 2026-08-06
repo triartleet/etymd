@@ -18,3 +18,20 @@ the machine's global git identity is usually
 # Public API filenames a user is told to create:
 registry\.local\.json
 sources\.local\.json
+#
+# Ordinary English that collides with a project name, and the tool describing its own check.
+North-star framing
+`/Users/` paths in the tracked file
+rule text .`/Users/
+bare "/Users/"
+/Users/ that keeps going
+#
+# Synthetic fixtures proving the machine-path detector fires. "someone" is not a user.
+/Users/someone
+/Users/\.\*/projects
+#
+# The detector's own tests, including one named "never prose ABOUT the ban".
+/Users/<anyone>
+Absolute .`/Users/…. paths are banned
+prose ABOUT the ban
+paths are banned in tracked files

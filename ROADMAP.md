@@ -29,7 +29,7 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
   manifest, and the fleet-scope wall findings. Registry + fleet `--json` schemas are
   experimental through 0.2.x.
 
-- **Scoped audits + two new skip classes** (2026-07-28), both harvested from the nanoclaw-v2 first
+- **Scoped audits + two new skip classes** (2026-07-28), both harvested from the oss-fork first
   audit and both proven on it:
 
   - **`.etymd/config.json`** (committed, every key optional) — `instructions.include` /
@@ -42,14 +42,14 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
     (migration quarantine dirs, generated output) is forward-looking, not stale; a naming
     stand-in (`my-custom-skill`, `your-*`) was never a claim. One plain reference anywhere in the
     file still makes a path a live claim, so a stale path cannot hide behind a single mention.
-  - **nanoclaw-v2 result** — 56 → 51 findings from the skip classes alone, then 51 → 3 once the
+  - **oss-fork result** — 56 → 51 findings from the skip classes alone, then 51 → 3 once the
     upstream skills directory is excluded: instruction-truth drops to **zero**, the fork's own
     layer (CLAUDE.md, plus its design docs pulled in by an include glob) is clean, and the 3 that
     remain are the deliberate CI-only gate gaps. The rest of the corpus is unmoved (workspace-fullstack 2,
     nx-monorepo 0, spa-bff 5, cra-legacy 4, vscode-extension 0, docs-only 0), so no real finding was skipped away.
 
 - **Corpus grown to 7** (2026-07-26): vscode-extension (first etymd-scaffolded contract in daily
-  use), docs-only (docs-only, no manifest), nanoclaw-v2 (large fork, 29KB CLAUDE.md, symlinked
+  use), docs-only (docs-only, no manifest), oss-fork (large fork, 29KB CLAUDE.md, symlinked
   AGENTS.md — onboarding pending). First `init` dogfood immediately caught two classes, both
   fixed at the source: the scaffold's frameworks fallback claimed `see package.json` in repos
   that have none (pack v2), and husky v9's `.husky/_` hooksPath misread as a custom hook setup.
@@ -71,7 +71,7 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
   an alternative to ledger dismissal. Scope globs and context budgets shipped 2026-07-28; these
   two were the parts of the original idea nothing has yet demanded.
 - **Corpus follow-ups, next sessions:**
-  - **nanoclaw-v2** — the fix is proven but NOT yet committed to the fork: writing
+  - **oss-fork** — the fix is proven but NOT yet committed to the fork: writing
     `.etymd/config.json` with `exclude: [".claude/skills/**"]` (+ `include: ["design/**/*.md"]`)
     is the owner's call, as is whether any skill under `.claude/skills/` is fork-owned and should
     stay in scope. The remaining 3 CI-only-gate gaps are deliberate hooks divergence from

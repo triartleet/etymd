@@ -174,7 +174,7 @@ describe("detectHooks", () => {
   })
 
   it("classifies husky v9's `.husky/_` hooksPath as husky, reading the real hooks", async () => {
-    // The nanoclaw-v2 class: `husky` (v9 prepare) sets core.hooksPath to its shim dir `.husky/_`
+    // The oss-fork class: `husky` (v9 prepare) sets core.hooksPath to its shim dir `.husky/_`
     // while the user's hooks live in `.husky/` — that must never read as a custom setup.
     await write(".husky/_/pre-commit", '#!/bin/sh\n. "$(dirname "$0")/h"\n')
     await write(".husky/_/pre-push", '#!/bin/sh\n. "$(dirname "$0")/h"\n')
