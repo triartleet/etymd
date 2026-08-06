@@ -250,6 +250,28 @@ A check that runs only in CI is itself a finding: the failure surfaces after the
 `etymd gates` installs the local pre-commit / pre-push mirror built from your own check scripts,
 and the `gate-integrity` lens flags whatever still runs in CI alone.
 
+### Your own checks, beside the generated ones
+
+Generated hooks are overwritten on every `etymd gates` run, so nothing hand-written belongs in
+them. Each one calls a companion instead — `.githooks/pre-commit.local`, `commit-msg.local`,
+`pre-push.local` — that etymd **never reads, writes, or regenerates**. Make it executable and it
+runs; a non-zero exit stops the commit or push exactly as the generated checks do.
+
+```sh
+cat > .githooks/pre-commit.local <<'EOF'
+#!/usr/bin/env sh
+# Whatever this project needs — etymd will not touch this file.
+./scripts/check-changelog.sh || exit 1
+EOF
+chmod +x .githooks/pre-commit.local
+```
+
+Two files, two owners. The generated half stays byte-identical to what the pack produces, which
+is what lets drift detection say something precise: a difference there means the _managed_ part
+was edited or went stale, never that you added a check of your own. Delete the companion and its
+checks stop running — that is what deleting a file means, and etymd does not police a file it
+does not own.
+
 ### The content screen (`etymd screen`)
 
 A separate question from "are the instructions true?": **does this repo carry text that must

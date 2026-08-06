@@ -198,6 +198,35 @@ describe("planWorkflow", () => {
     expect(withOverride).toContain("lint:fix")
   })
 
+  it("PINNED: every generated hook calls a repo-owned companion it never generates", () => {
+    // The seam that makes regeneration safe. Without it, a repo with its own guards had to
+    // choose between accepting the pack (losing them) and hand-maintaining the file (losing
+    // regeneration) — and a trial migration of real repos destroyed working checks proving it.
+    const hooks: [string, string][] = [
+      ["pre-commit", generatePreCommitHook()],
+      ["commit-msg", generateCommitMsgHook()],
+      ["pre-push", generatePrePushHook(facts())],
+    ]
+    for (const [name, body] of hooks) {
+      expect(body).toContain(`${name}.local`)
+      // Guarded on the executable bit, so an absent companion is simply skipped.
+      expect(body).toContain('if [ -x "$LOCAL" ]')
+      // A failing repo-owned check must stop the operation, not be swallowed.
+      expect(body).toContain('"$LOCAL" "$@" || exit 1')
+    }
+  })
+
+  it("keeps the generated file free of hand-written content, so drift stays byte-exact", async () => {
+    // The companion is a separate FILE, deliberately not a marked region inside the generated
+    // one: drift detection is exact byte equality, and any hand-written text living in the
+    // compared file would make a tampered gate indistinguishable from an edited note.
+    const plan = await planWorkflow("/nonexistent-root", facts(), { agents: false, gates: true })
+    for (const f of plan.filter((p) => p.executable)) {
+      expect(f.contents).not.toContain("etymd:keep")
+      expect(f.path).not.toContain(".local")
+    }
+  })
+
   it("PINNED: every generated gate is inert without a checker — safe to commit to a public repo", () => {
     // The hooks carry no patterns and no policy: they resolve an external checker and no-op
     // when it is absent. This is what lets the same file be committed anywhere.

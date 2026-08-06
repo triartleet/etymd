@@ -141,9 +141,37 @@ ${
  */
 const CONTENT_GATE_RESOLUTION = `GATE="\${CONTENT_GATE:-$(command -v etymd || true)}"`
 
+/**
+ * The seam between what the pack owns and what the repo owns.
+ *
+ * A generated file that cannot hold anything local forces a false choice: accept the pack and
+ * lose your own checks, or hand-maintain the file and lose regeneration. Both were observed in
+ * real repos — one carries a bespoke archive guard, another documents why its audit tier differs
+ * from every sibling — and regenerating either would have destroyed working, reasoned work.
+ *
+ * So the pack owns the whole generated file and simply CALLS a companion it never reads or
+ * writes. Two files, two owners, one convention. Deliberately not a marked region inside the
+ * generated file: drift detection is exact byte equality, so any hand-written text living in the
+ * compared file destroys the ability to tell a tampered gate from an edited note, and would make
+ * the tool parse its own output forever.
+ *
+ * Delete the companion and its checks stop running — which is what deleting a file means. Etymd
+ * does not police a file it does not own.
+ */
+function localHookCall(hook: string): string {
+  return `# Repo-owned checks. This file is generated and will be overwritten; \`.githooks/${hook}.local\`
+# is yours — etymd never reads, writes, or regenerates it. Put project-specific guards there.
+LOCAL="$(dirname "$0")/${hook}.local"
+if [ -x "$LOCAL" ]; then
+  "$LOCAL" "$@" || exit 1
+fi`
+}
+
 export function generatePreCommitHook(): string {
   return `#!/usr/bin/env sh
 # etymd: process gate. Cheap, locally-knowable checks belong here (fast, blocks the commit).
+
+${localHookCall("pre-commit")}
 
 # Content screen — staged file bytes. Refuses to commit environment, employer or identity
 # detail into a repo whose history is (or could become) public. The checker and its patterns
@@ -178,6 +206,8 @@ if [ -x "$GATE" ]; then
   "$GATE" screen --message "$1" || exit 1
 fi
 
+${localHookCall("commit-msg")}
+
 exit 0
 `
 }
@@ -211,6 +241,8 @@ else
 fi`
   return `#!/usr/bin/env sh
 # etymd: correctness gate. Mirrors CI cheapest-first; blocks the push on any failure.
+
+${localHookCall("pre-push")}
 ${body}
 ${auditStep}
 
