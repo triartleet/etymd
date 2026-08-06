@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" width="640" height="300" role="img" aria-label="Etymd — a papyrus of written instructions, each line checked against the repository it describes">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e2a3a"/>
+      <stop offset="1" stop-color="#121a24"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#e8a913"/>
+      <stop offset="0.5" stop-color="#ffd970"/>
+      <stop offset="1" stop-color="#e8a913"/>
+    </linearGradient>
+    <linearGradient id="papyrus" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e8d9b0"/>
+      <stop offset="0.5" stop-color="#dcc899"/>
+      <stop offset="1" stop-color="#cdb582"/>
+    </linearGradient>
+    <linearGradient id="rod" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a8763c"/>
+      <stop offset="0.5" stop-color="#7d5427"/>
+      <stop offset="1" stop-color="#5e3d1b"/>
+    </linearGradient>
+    <clipPath id="frame">
+      <rect width="640" height="300" rx="18"/>
+    </clipPath>
+    <clipPath id="sheet">
+      <rect x="86" y="66" width="168" height="168"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#frame)">
+    <rect width="640" height="300" fill="url(#bg)"/>
+
+    <!-- LEFT: the papyrus — the written instruction -->
+    <g>
+      <!-- sheet -->
+      <rect x="86" y="66" width="168" height="168" fill="url(#papyrus)"/>
+      <!-- fibre texture -->
+      <g clip-path="url(#sheet)" stroke="#b9a170" stroke-width="1" opacity="0.45">
+        <line x1="86" y1="86" x2="254" y2="86"/>
+        <line x1="86" y1="122" x2="254" y2="122"/>
+        <line x1="86" y1="158" x2="254" y2="158"/>
+        <line x1="86" y1="194" x2="254" y2="194"/>
+        <line x1="110" y1="66" x2="110" y2="234"/>
+        <line x1="152" y1="66" x2="152" y2="234"/>
+        <line x1="194" y1="66" x2="194" y2="234"/>
+        <line x1="230" y1="66" x2="230" y2="234"/>
+      </g>
+      <!-- torn top and bottom edges -->
+      <path d="M86 66 q10 5 20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 V60 H86 Z" fill="#1e2a3a"/>
+      <path d="M86 234 q10 -5 20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 t20 0 V240 H86 Z" fill="#1e2a3a"/>
+
+      <!-- written lines: the claims -->
+      <g fill="#4a3a22">
+        <rect x="106" y="88" width="74" height="6" rx="3"/>
+        <rect x="106" y="112" width="122" height="5" rx="2.5" opacity="0.82"/>
+        <rect x="106" y="136" width="106" height="5" rx="2.5" opacity="0.82"/>
+        <rect x="106" y="160" width="128" height="5" rx="2.5" opacity="0.82"/>
+        <rect x="106" y="184" width="98" height="5" rx="2.5" opacity="0.82"/>
+        <rect x="106" y="208" width="118" height="5" rx="2.5" opacity="0.82"/>
+      </g>
+
+      <!-- rolled rods -->
+      <rect x="74" y="58" width="14" height="184" rx="7" fill="url(#rod)"/>
+      <rect x="252" y="58" width="14" height="184" rx="7" fill="url(#rod)"/>
+    </g>
+
+    <!-- verification beams: every written line is checked -->
+    <g stroke="#f0b81f" stroke-width="3" stroke-linecap="round" fill="none" stroke-dasharray="7 7">
+      <path d="M274 115 H362"/>
+      <path d="M274 139 H362"/>
+      <path d="M274 163 H362"/>
+      <path d="M274 187 H362"/>
+      <path d="M274 211 H362"/>
+    </g>
+
+    <!-- verdicts: three hold, two have drifted. Marks are ~13px on a 24px row
+         pitch, so each keeps clear air above and below rather than crowding
+         its neighbours. -->
+    <g stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <path d="M376 114 l5.5 6 11 -12.5" stroke="#5bc98a"/>
+      <g stroke="#e8664a">
+        <line x1="377" y1="135" x2="390" y2="145"/>
+        <line x1="390" y1="135" x2="377" y2="145"/>
+      </g>
+      <path d="M376 162 l5.5 6 11 -12.5" stroke="#5bc98a"/>
+      <g stroke="#e8664a">
+        <line x1="377" y1="183" x2="390" y2="193"/>
+        <line x1="390" y1="183" x2="377" y2="193"/>
+      </g>
+      <path d="M376 210 l5.5 6 11 -12.5" stroke="#5bc98a"/>
+    </g>
+
+    <!-- RIGHT: the repository — the ground truth -->
+    <g transform="translate(444 62)">
+      <rect width="130" height="180" rx="10" fill="#243244" stroke="#4a5f7a" stroke-width="2.5"/>
+      <g fill="#8ea4bd">
+        <rect x="22" y="30" width="14" height="11" rx="2.5"/>
+        <rect x="44" y="32" width="52" height="7" rx="3.5" opacity="0.75"/>
+        <rect x="36" y="58" width="14" height="11" rx="2.5"/>
+        <rect x="58" y="60" width="42" height="7" rx="3.5" opacity="0.75"/>
+        <rect x="36" y="86" width="14" height="11" rx="2.5"/>
+        <rect x="58" y="88" width="50" height="7" rx="3.5" opacity="0.75"/>
+        <rect x="22" y="114" width="14" height="11" rx="2.5"/>
+        <rect x="44" y="116" width="46" height="7" rx="3.5" opacity="0.75"/>
+        <rect x="36" y="142" width="14" height="11" rx="2.5"/>
+        <rect x="58" y="144" width="38" height="7" rx="3.5" opacity="0.75"/>
+      </g>
+    </g>
+  </g>
+</svg>

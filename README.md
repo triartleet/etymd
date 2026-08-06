@@ -1,7 +1,13 @@
-# etymd
+# Etymd
 
-[![npm version](https://img.shields.io/npm/v/etymd.svg)](https://www.npmjs.com/package/etymd)
-[![CI](https://img.shields.io/github/actions/workflow/status/triartleet/etymd/ci.yml?branch=main&label=CI)](https://github.com/triartleet/etymd/actions/workflows/ci.yml)
+<div align="center">
+  <img src="media/etymd-logo.png" width="520" alt="Etymd — a papyrus of written instructions, each line checked against the repository it describes">
+  <p>
+    <a href="https://www.npmjs.com/package/etymd"><img src="https://img.shields.io/npm/v/etymd.svg?label=npm&color=cb3837" alt="npm version"></a>
+    <a href="https://github.com/triartleet/etymd/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/triartleet/etymd/ci.yml?branch=main&label=CI" alt="CI"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+  </p>
+</div>
 
 **Keep your agent instructions true.**
 
@@ -9,7 +15,7 @@ You wrote rules for your AI months ago. Since then a script got renamed, a folde
 changed — and the AI still trusts every word. The file never complains when it goes stale; it just
 keeps instructing, confidently, and you live with the results.
 
-etymd reads those instruction files and checks every claim in them against your actual project.
+Etymd reads those instruction files and checks every claim in them against your actual project.
 
 One command, run in your project's folder (needs Node ≥ 18.17, nothing else): `npx etymd audit`.
 Here it is on a small demo project whose AGENTS.md still tells the AI to run `npm run start` and
@@ -53,7 +59,7 @@ _From Greek **étymon** — a word's true, original sense (→ etymology) — cl
 - **Truth is a property over time, not a point in time.** Instruction files are load-bearing now —
   coding agents (Claude Code, Codex, Cursor, Copilot, Gemini, …) read `AGENTS.md` natively, and a
   stale claim doesn't error, it silently misleads every session. Linters for these files check a
-  moment; etymd measures _drift_ against a committed _baseline_ and remembers findings in a
+  moment; Etymd measures _drift_ against a committed _baseline_ and remembers findings in a
   _ledger_, so fixed things stay fixed and a returning problem is named a _regression_ (all four
   words defined just below). It runs when you invoke it — or when a hook or CI job you wire up
   does.
@@ -64,7 +70,7 @@ _From Greek **étymon** — a word's true, original sense (→ etymology) — cl
   the checks filter aggressively — and every class of claim they skip is counted and disclosed,
   never silently dropped.
 
-## The words etymd uses
+## The words Etymd uses
 
 | The docs say          | It means                                                                                                                                                                                                             |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -84,7 +90,7 @@ _From Greek **étymon** — a word's true, original sense (→ etymology) — cl
 
 - **"It missed an obvious stale command."** Without `node_modules` installed, command claims are
   skipped — and the skip is disclosed in the report. A command might resolve to an installed
-  binary, and etymd would rather say "couldn't check" than accuse an honest file. Install
+  binary, and Etymd would rather say "couldn't check" than accuse an honest file. Install
   dependencies and run again.
 - **`etymd audit` works without `etymd init`.** You only lose drift-over-time measurement — with
   no committed baseline, there is nothing to measure drift against. Everything else runs.
@@ -167,7 +173,7 @@ personal and employer repos. See [the fleet manifest](#the-fleet-manifest-experi
 `--cwd <dir>` targets another directory. Read-only probing of any repo leaves **zero trace**
 (`audit --no-ledger` writes nothing).
 
-## The files etymd keeps
+## The files Etymd keeps
 
 | Path                   | Lifecycle     | Role                                             |
 | ---------------------- | ------------- | ------------------------------------------------ |
@@ -180,7 +186,7 @@ The committed files are written to be publishable: the baseline records `"."` as
 your absolute machine path. Only the gitignored cache keeps the real one.
 
 Formatter interop: if your Prettier (or similar formatter) checks JSON, add `.etymd` to
-`.prettierignore` — etymd writes its own JSON style, and a format gate fighting the ledger is
+`.prettierignore` — Etymd writes its own JSON style, and a format gate fighting the ledger is
 noise (this repo does exactly that).
 
 ### `.etymd/config.json` (optional)
@@ -206,7 +212,7 @@ Every key is optional; omit the file entirely and the defaults below apply.
 Globs are repo-relative: `*` within a path segment, `**` across segments, `?` one character. A
 pattern with no wildcard is a **path prefix**, so `.claude/skills` covers everything beneath it.
 
-Narrowing an audit can hide findings, so etymd never lets it happen quietly. Honesty is
+Narrowing an audit can hide findings, so Etymd never lets it happen quietly. Honesty is
 structural: **every excluded file is counted and named in the lens disclosures**, and a config
 that fails to parse is reported as a disclosure rather than silently falling back to defaults.
 
@@ -227,13 +233,13 @@ The ledger and baseline are not CI by-products — they are **committed, reviewa
 updated locally and read in CI. A dismissal (with its reason), an accepted finding, a baseline
 refresh after an intentional restructure: each lands in `.etymd/` and shows up in the pull
 request diff like any other change. Keep `.etymd` out of your formatter's reach (see
-[the files etymd keeps](#the-files-etymd-keeps)).
+[the files Etymd keeps](#the-files-etymd-keeps)).
 
 A check that runs only in CI is itself a finding: the failure surfaces after the agent finished.
 `etymd gates` installs the local pre-commit / pre-push mirror built from your own check scripts,
 and the `gate-integrity` lens flags whatever still runs in CI alone.
 
-Modeled on this repo's own workflow (etymd guards its own instructions with etymd — its CI runs
+Modeled on this repo's own workflow (Etymd guards its own instructions with Etymd — its CI runs
 the same gate against its own freshly built CLI):
 
 ```yaml
@@ -329,7 +335,7 @@ How the sweep behaves:
   is deliberately no env var and no home-directory pointer.
 
 Formatter interop for the `.etymd` state the sweep resolves: same rule as everywhere — see
-[the files etymd keeps](#the-files-etymd-keeps).
+[the files Etymd keeps](#the-files-etymd-keeps).
 
 ## Programmatic use
 
@@ -342,7 +348,7 @@ console.log(audit.findings) // one schema: claim · evidence · why · action ·
 
 ## The corpus (how this is validated)
 
-etymd is developed against a corpus of real sibling repos rather than fixtures alone —
+Etymd is developed against a corpus of real sibling repos rather than fixtures alone —
 [`sources.json`](sources.json) lists them by shape. Every heuristic here exists because a real
 repo proved the previous one wrong, and each skip class in the truth lens is a false positive that
 a corpus run caught.
@@ -355,7 +361,7 @@ mapping each name to its sibling directory:
 { "dirs": { "nx-monorepo": "my-monorepo-checkout" } }
 ```
 
-Each value is resolved as a sibling of the etymd checkout.
+Each value is resolved as a sibling of the Etymd checkout.
 
 Without it — on a fresh clone or in CI — those suites skip cleanly and the rest still run.
 
