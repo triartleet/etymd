@@ -6,17 +6,17 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
 ## Now (prove it in daily use)
 
 - **Daily-driver validation on the corpus.** Run `etymd audit` routinely on the sibling repos
-  (pepshop as the clean control; cra-legacy/spa-bff as the findings-rich cases); fix every false positive at
-  the heuristic level. Model passes so far: pepshop 24→0 (command-position matching,
+  (the workspace-fullstack corpus as the clean control; cra-legacy/spa-bff as the findings-rich cases); fix every false positive at
+  the heuristic level. Model passes so far: workspace-fullstack 24→0 (command-position matching,
   extensionless-token=prose, workspace-relative resolution); the `yarn nx` class (nx-monorepo 1→0) —
   a command that resolves to an installed `node_modules/.bin` binary is true, not a stale script,
-  and is unverifiable (skipped + disclosed) when `node_modules` is absent; and the pepshop-main
+  and is unverifiable (skipped + disclosed) when `node_modules` is absent; and the workspace-fullstack-main
   pass (4→2, 2026-07-25): dotted prose like Better-Auth's `create/update.after` needs a
   _recognized_ extension to be a file claim, and a missing-but-gitignored claim (`apps/api/.env`)
-  is machine-local — unverifiable, skipped + disclosed. Current corpus baseline: pepshop 2
+  is machine-local — unverifiable, skipped + disclosed. Current corpus baseline: workspace-fullstack 2
   (context-economy, real), cra-legacy 4, spa-bff 5 (3 real stale-path), nx-monorepo 0. **First external gate is
-  live:** pepshop's pre-push hook runs `etymd audit --fail-on risk` via the sibling checkout
-  (pepshop MR 161) — the CI half follows once etymd has a remote.
+  live:** the workspace-fullstack corpus repo’s pre-push hook runs `etymd audit --fail-on risk` via the sibling checkout
+  (an external MR) — the CI half follows once etymd has a remote.
 
 ### Shipped since 003
 
@@ -45,11 +45,11 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
   - **nanoclaw-v2 result** — 56 → 51 findings from the skip classes alone, then 51 → 3 once the
     upstream skills directory is excluded: instruction-truth drops to **zero**, the fork's own
     layer (CLAUDE.md, plus its design docs pulled in by an include glob) is clean, and the 3 that
-    remain are the deliberate CI-only gate gaps. The rest of the corpus is unmoved (pepshop 2,
-    nx-monorepo 0, spa-bff 5, cra-legacy 4, cc-gg-bridgy 0, wonderbee 0), so no real finding was skipped away.
+    remain are the deliberate CI-only gate gaps. The rest of the corpus is unmoved (workspace-fullstack 2,
+    nx-monorepo 0, spa-bff 5, cra-legacy 4, vscode-extension 0, docs-only 0), so no real finding was skipped away.
 
-- **Corpus grown to 7** (2026-07-26): cc-gg-bridgy (first etymd-scaffolded contract in daily
-  use), wonderbee (docs-only, no manifest), nanoclaw-v2 (large fork, 29KB CLAUDE.md, symlinked
+- **Corpus grown to 7** (2026-07-26): vscode-extension (first etymd-scaffolded contract in daily
+  use), docs-only (docs-only, no manifest), nanoclaw-v2 (large fork, 29KB CLAUDE.md, symlinked
   AGENTS.md — onboarding pending). First `init` dogfood immediately caught two classes, both
   fixed at the source: the scaffold's frameworks fallback claimed `see package.json` in repos
   that have none (pack v2), and husky v9's `.husky/_` hooksPath misread as a custom hook setup.
@@ -76,11 +76,11 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
     is the owner's call, as is whether any skill under `.claude/skills/` is fork-owned and should
     stay in scope. The remaining 3 CI-only-gate gaps are deliberate hooks divergence from
     upstream.
-  - **wonderbee** — the contract deliberately says "do not start building"; as design sessions
+  - **docs-only** — the contract deliberately says "do not start building"; as design sessions
     produce the decision record and the stack lands, the AGENTS.md fills in and `etymd audit`
     tracks each claim as it becomes checkable. First re-approve will restamp pack v1 → v2.
-  - **cc-gg-bridgy** — first push exercises the new pre-push gate live; when the repo gets CI,
-    gate it on `etymd audit --fail-on risk` (the second external gate after pepshop). Also
+  - **vscode-extension** — first push exercises the new pre-push gate live; when the repo gets CI,
+    gate it on `etymd audit --fail-on risk` (the second external gate after the workspace-fullstack corpus). Also
     restamps to pack v2 on next approve.
 - **Baseline-aware CI recipe hardening**: document the two-job pattern (audit `--fail-on risk` on
   MRs; scheduled full audit that comments the ledger diff).
@@ -88,7 +88,7 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
   words/tokens per session), so the lens's advice carries a number. Budgets are now per-repo
   configurable, so the next question is what a _right_ budget is, not where it lives.
 - **AI-review gate harvest**: distill the two real advisory AI-review CI jobs living in the corpus
-  (pepshop's claude-review, and the Nx monorepo's advisory `ai review`) into a `gates --ci` generator.
+  (one corpus repo’s AI-review job, and the Nx monorepo's advisory `ai review`) into a `gates --ci` generator.
 
 ## Later (only if the objective still leads)
 
@@ -104,7 +104,7 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
   always-loaded context measurement names `PROJECT_CONTEXT.md` literally, so a registry
   `contract.state` override (e.g. `STATUS.md`) is freshness-checked but does not yet join
   `measureContext` — join it by artifact kind in slice 3.
-- Loop metrics ingest (pepshop's `scripts/loop-metrics.mjs` output) — measurement of the loop the
+- Loop metrics ingest (workspace-fullstack's `scripts/loop-metrics.mjs` output) — measurement of the loop the
   instructions serve.
 - Watch-mode / git-hook integration (`etymd audit --truth` as a pre-push step in guarded repos).
 - More instruction dialects as they standardize (new agent config locations).

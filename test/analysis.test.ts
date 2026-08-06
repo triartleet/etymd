@@ -54,7 +54,7 @@ describe("generateAgentsMd (minimal scaffold)", () => {
   })
 
   it("never points at package.json in a docs-only repo that has none", () => {
-    // The wonderbee class: no manifest, no scripts, no frameworks — the scaffold must not
+    // The docs-only class: no manifest, no scripts, no frameworks — the scaffold must not
     // reference a file the scan never saw.
     const md = generateAgentsMd(
       facts({

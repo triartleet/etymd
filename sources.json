@@ -1,9 +1,9 @@
 {
-  "$comment": "Corpus manifest — the sibling repos etymd validates against (the dogfood harness). An entry marked `private` is named by SHAPE, not by directory: its local directory comes from an untracked sources.local.json (see README). Corpus tests skip cleanly wherever a repo is absent.",
+  "$comment": "Corpus manifest — the sibling repos etymd validates against (the dogfood harness). Entries are named by SHAPE, not by directory: the local directory for each comes from an untracked sources.local.json (see README). Corpus tests skip cleanly wherever a repo is absent, so a fresh clone runs them as no-ops.",
   "sources": [
     {
-      "name": "pepshop",
-      "path": "../pepshop",
+      "name": "workspace-fullstack",
+      "private": true,
       "role": "primary",
       "shape": "pnpm-workspace / TanStack Start + Express/tRPC",
       "note": "frontrunner — the locked workflow and golden fixture for corpus reproduction"
@@ -30,22 +30,22 @@
       "note": "legacy command-set and hook-setup coverage; the script-less coverage job that motivated the gate-integrity honesty rules"
     },
     {
-      "name": "cc-gg-bridgy",
-      "path": "../cc-gg-bridgy",
+      "name": "vscode-extension",
+      "private": true,
       "role": "reference",
       "shape": "single-repo VS Code extension / esbuild + pnpm",
       "note": "smallest surface; first etymd-scaffolded contract in daily use (init dogfood 2026-07-26)"
     },
     {
-      "name": "wonderbee",
-      "path": "../wonderbee",
+      "name": "docs-only",
+      "private": true,
       "role": "reference",
       "shape": "docs-only, no package manifest",
       "note": "pre-design repo; covers the no-manifest scaffold class (the see-package.json fix)"
     },
     {
-      "name": "wonder-worker",
-      "path": "../wonder-worker",
+      "name": "oss-fork",
+      "private": true,
       "role": "reference",
       "shape": "pnpm + Bun fork of an active upstream OSS assistant",
       "note": "large claim-rich surface: 29KB CLAUDE.md, symlinked+gitignored AGENTS.md, husky; the fork-scoping case"

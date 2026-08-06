@@ -67,7 +67,7 @@ describe("claim extraction", () => {
         "Routes live at `/admin/batches` and `~/home` and `@scope/pkg`.",
         "Globs like `src/**/*.ts` and urls `https://x.dev/a/b` and `$VAR/x` are skipped.",
         "Route params `p/$slug` are skipped.",
-        // Dotted prose is not a file claim: Better-Auth hook notation from the pepshop corpus.
+        // Dotted prose is not a file claim: Better-Auth hook notation from the workspace-fullstack corpus.
         "Hooks fire on `create/update.after` once an address is proven.",
         "Unrecognized extensions like `pkg/mod.xyz9` stay prose.",
       ].join("\n"),
@@ -196,7 +196,7 @@ describe("instruction-truth lens (the lying-AGENTS.md fixture)", () => {
     )
     const report = await runTruth()
     // Both claims resolve in the workspace — flagging them would be the false-positive class
-    // the pepshop live run exposed.
+    // the workspace-fullstack live run exposed.
     expect(report.findings).toEqual([])
   })
 

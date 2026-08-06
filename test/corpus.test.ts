@@ -38,30 +38,38 @@ describe("corpus manifest — the legacy shape loads through the fleet loader", 
   })
 })
 
-describe.skipIf(!hasRepo("pepshop"))("corpus: pepshop (control — the gold standard)", () => {
-  it("scans as a pnpm workspace with wired tracked githooks", async () => {
-    const facts = await scanProject(repo("pepshop"))
-    expect(facts.packageManager).toBe("pnpm")
-    expect(facts.workspace.kind).toBe("pnpm")
-    expect(facts.hooks.source).toBe("githooks")
-    expect(facts.hooks.preCommit).toBe(true)
-    expect(facts.hooks.prePush).toBe(true)
-    expect(facts.commands.formatCheck).toBe("format:check")
-    expect(facts.artifacts.find((a) => a.id === "agents")?.exists).toBe(true)
-    expect(facts.artifacts.find((a) => a.id === "failure-modes-skill")?.exists).toBe(true)
-  })
+describe.skipIf(!hasRepo("workspace-fullstack"))(
+  "corpus: workspace-fullstack (control — the gold standard)",
+  () => {
+    it("scans as a pnpm workspace with wired tracked githooks", async () => {
+      const facts = await scanProject(repo("workspace-fullstack"))
+      expect(facts.packageManager).toBe("pnpm")
+      expect(facts.workspace.kind).toBe("pnpm")
+      expect(facts.hooks.source).toBe("githooks")
+      expect(facts.hooks.preCommit).toBe(true)
+      expect(facts.hooks.prePush).toBe(true)
+      expect(facts.commands.formatCheck).toBe("format:check")
+      expect(facts.artifacts.find((a) => a.id === "agents")?.exists).toBe(true)
+      expect(facts.artifacts.find((a) => a.id === "failure-modes-skill")?.exists).toBe(true)
+    })
 
-  it("runs the truth lens read-only over the real contract + skills without throwing", async () => {
-    const root = repo("pepshop")
-    const facts = await scanProject(root)
-    const report = await instructionTruthLens.run({ root, facts, profile: "solo", baseline: null })
-    expect(report.status).toBe("ran")
-    // The instruction set includes AGENTS.md + CLAUDE.md + skills — several files, all checked.
-    expect(report.disclosures.some((d) => /Checked \d+ instruction file/.test(d))).toBe(true)
-    // Findings may legitimately exist (repos evolve); every one must carry evidence.
-    for (const f of report.findings) expect(f.evidence.length).toBeGreaterThan(0)
-  })
-})
+    it("runs the truth lens read-only over the real contract + skills without throwing", async () => {
+      const root = repo("workspace-fullstack")
+      const facts = await scanProject(root)
+      const report = await instructionTruthLens.run({
+        root,
+        facts,
+        profile: "solo",
+        baseline: null,
+      })
+      expect(report.status).toBe("ran")
+      // The instruction set includes AGENTS.md + CLAUDE.md + skills — several files, all checked.
+      expect(report.disclosures.some((d) => /Checked \d+ instruction file/.test(d))).toBe(true)
+      // Findings may legitimately exist (repos evolve); every one must carry evidence.
+      for (const f of report.findings) expect(f.evidence.length).toBeGreaterThan(0)
+    })
+  },
+)
 
 describe.skipIf(!hasRepo("nx-monorepo"))("corpus: nx-monorepo (Nx team repo)", () => {
   it("classifies the narrow unit command, never the meta runner or a writer", async () => {
@@ -103,11 +111,11 @@ describe.skipIf(!hasRepo("cra-legacy"))("corpus: cra-legacy (the un-converted re
   })
 })
 
-describe.skipIf(!hasRepo("cc-gg-bridgy"))(
-  "corpus: cc-gg-bridgy (etymd-scaffolded extension)",
+describe.skipIf(!hasRepo("vscode-extension"))(
+  "corpus: vscode-extension (etymd-scaffolded extension)",
   () => {
     it("scans the onboarded state: pnpm, tracked githooks, contract present", async () => {
-      const facts = await scanProject(repo("cc-gg-bridgy"))
+      const facts = await scanProject(repo("vscode-extension"))
       expect(facts.packageManager).toBe("pnpm")
       expect(facts.hooks.source).toBe("githooks")
       expect(facts.commands.typecheck).toBe("typecheck")
@@ -115,7 +123,7 @@ describe.skipIf(!hasRepo("cc-gg-bridgy"))(
     })
 
     it("truth lens holds on the contract etymd itself scaffolded", async () => {
-      const root = repo("cc-gg-bridgy")
+      const root = repo("vscode-extension")
       const facts = await scanProject(root)
       const report = await instructionTruthLens.run({
         root,
@@ -129,9 +137,9 @@ describe.skipIf(!hasRepo("cc-gg-bridgy"))(
   },
 )
 
-describe.skipIf(!hasRepo("wonderbee"))("corpus: wonderbee (docs-only, no manifest)", () => {
+describe.skipIf(!hasRepo("docs-only"))("corpus: docs-only (no manifest)", () => {
   it("scans a repo with no package.json without inventing facts", async () => {
-    const facts = await scanProject(repo("wonderbee"))
+    const facts = await scanProject(repo("docs-only"))
     expect(facts.packageManager).toBe("unknown")
     expect(facts.workspace.kind).toBe("none")
     expect(facts.commands.test).toBeUndefined()
@@ -139,7 +147,7 @@ describe.skipIf(!hasRepo("wonderbee"))("corpus: wonderbee (docs-only, no manifes
   })
 
   it("truth lens runs over a code-free contract", async () => {
-    const root = repo("wonderbee")
+    const root = repo("docs-only")
     const facts = await scanProject(root)
     const report = await instructionTruthLens.run({ root, facts, profile: "solo", baseline: null })
     expect(report.status).toBe("ran")

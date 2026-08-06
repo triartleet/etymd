@@ -11,7 +11,7 @@ Greek _étymon_, a word's true sense, + the `.md` family it guards). One objecti
 agent instructions true**. It verifies the agent context layer (AGENTS.md, CLAUDE.md, rules,
 skills) against the actual repo — command claims, path claims, consistency, CI↔local gate parity,
 context economy — with drift measured against a committed baseline and a regression ledger.
-Distilled from the pepshop frontrunner workflow, validated against a sibling-repo corpus
+Distilled from a frontrunner project workflow, validated against a sibling-repo corpus
 (`sources.json`). Solo developer; publish to npm is deliberately HELD until it earns it.
 
 ## Stack
