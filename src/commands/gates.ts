@@ -11,13 +11,13 @@ import { scanProject } from "../core/scan.js"
 import type { ProjectFacts } from "../core/types.js"
 import { git, readText } from "../core/util.js"
 import { isSafeGateCommand, runPrefix } from "../pack/templates.js"
+import { print, renderPlan, section } from "../ui/render.js"
+import { glyph, theme } from "../ui/theme.js"
 
 /** The publish door: the script etymd owns, and the one package.json key that fires it. */
 const PUBLISH_GATE_SCRIPT = "scripts/artifact-check.sh"
 const PUBLISH_GATE_KEY = "prepublishOnly"
 const PUBLISH_GATE_VALUE = `./${PUBLISH_GATE_SCRIPT}`
-import { print, renderPlan, section } from "../ui/render.js"
-import { glyph, theme } from "../ui/theme.js"
 
 export interface GatesOptions {
   cwd: string
@@ -34,7 +34,11 @@ function derivedCommands(facts: ProjectFacts): string[] {
 }
 
 /** Show the derivations in one place, so "accept" is an informed keystroke rather than a guess. */
-function printGateSummary(gates: GateConfig, facts: ProjectFacts): void {
+function printGateSummary(
+  gates: GateConfig,
+  facts: ProjectFacts,
+  source: { recorded: boolean; willRecord: boolean },
+): void {
   const run = runPrefix(facts.packageManager)
   const cmds = gates.commands.length
     ? gates.commands.map((c) => `${run} ${c}`).join(", ")
@@ -46,7 +50,16 @@ function printGateSummary(gates: GateConfig, facts: ProjectFacts): void {
       gates.publishGate && !facts.publishable ? theme.dim(" (overridden)") : ""
     }`,
   )
-  print(`  ${theme.dim(`change any of these later in ${CONFIG_FILE}`)}`)
+  // Point at the file only when one exists or is about to. A non-interactive run records
+  // nothing — these values are the scan's guess, not a decision, and re-deriving next run is
+  // what keeps a repo's gates current as its scripts change.
+  if (source.recorded || source.willRecord) {
+    print(`  ${theme.dim(`change any of these later in ${CONFIG_FILE}`)}`)
+  } else {
+    print(
+      `  ${theme.dim(`derived from this repo — write ${CONFIG_FILE} (or run without --yes) to pin them`)}`,
+    )
+  }
 }
 
 /** The escape hatch behind "customize" — the same choices, for the person who wants them. */
@@ -152,7 +165,10 @@ export async function run(opts: GatesOptions): Promise<void> {
   // Everything below is DERIVED and shown, not asked. Getting a derivation wrong costs a
   // slightly slow hook or a slightly strict audit — both one edit away — so the default path is
   // a single keystroke, and `customize` exists for the person who wants the choices.
-  const { config } = await readConfig(opts.cwd)
+  const { config, present: hasConfig } = await readConfig(opts.cwd)
+  // `--yes` records nothing: with no one to decide, the values are the scan's guess, and
+  // freezing a guess as a decision would silently stop the gate tracking the repo's scripts.
+  const configSource = { recorded: hasConfig, willRecord: !opts.yes }
   let gateConfig: GateConfig = {
     ...config.gates,
     commands: config.gates.commands.length ? config.gates.commands : derivedCommands(facts),
@@ -169,7 +185,7 @@ export async function run(opts: GatesOptions): Promise<void> {
   }
   let gateFiles = await plan()
   renderPlan(gateFiles)
-  printGateSummary(gateConfig, facts)
+  printGateSummary(gateConfig, facts, configSource)
 
   if (!opts.yes) {
     const choice = await select({
@@ -194,7 +210,7 @@ export async function run(opts: GatesOptions): Promise<void> {
       gateConfig = customized
       gateFiles = await plan()
       renderPlan(gateFiles)
-      printGateSummary(gateConfig, facts)
+      printGateSummary(gateConfig, facts, configSource)
     }
     // Choices are recorded so a re-run never re-asks and a drift check has something to
     // compare against.
