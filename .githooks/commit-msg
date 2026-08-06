@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+# Commit messages are published history too, and the staged-content gate cannot see them:
+# it reads `git diff --cached`, which is file bytes only. No-op where the checker is absent.
+#
+# Bypass, with a reason: git commit --no-verify
+GATE="${COMMIT_MSG_GATE:-$HOME/.local/bin/commit-msg-check}"
+if [ -x "$GATE" ]; then
+  "$GATE" "$1" || exit 1
+fi
+
+exit 0

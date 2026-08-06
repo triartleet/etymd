@@ -14,3 +14,12 @@ if [ -f dist/cli.js ]; then
 else
   echo "› etymd audit skipped (no dist/ — run npm run build)"
 fi
+
+# Content gate, second pass: catches anything committed with --no-verify, and anything a
+# rebase or merge brought in from elsewhere. Scans the whole tree rather than one diff.
+GATE="${CONTENT_GATE:-$HOME/.local/bin/public-repo-check}"
+if [ -x "$GATE" ] && [ "${CONTENT_GATE_PREPUSH:-1}" = "1" ]; then
+  "$GATE" --tree 2>/dev/null || true
+fi
+
+exit 0

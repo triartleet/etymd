@@ -1,0 +1,20 @@
+# Strings the artifact gate may see in a published build, one extended-regex per line.
+# Keep each as narrow as the exception genuinely is — this file is a hole in the gate.
+#
+# This tool detects leaked machine paths and corp identities, so its own source and its own
+# documentation necessarily contain the patterns it screens for and the findings it emits.
+# A scanner cannot describe what it looks for without containing it. These are that class,
+# and nothing else belongs here.
+#
+# The tool's own detection rule and the findings it emits:
+MACHINE_PATH_GREP
+absolute /Users/ paths?
+contains an absolute
+tracked `/Users/` paths
+`/Users/` paths in the manifest
+A corp email in a personal repo
+the machine's global git identity is usually
+#
+# Public API filenames a user is told to create:
+registry\.local\.json
+sources\.local\.json

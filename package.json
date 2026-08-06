@@ -58,7 +58,7 @@
     "format:check": "prettier --check . && npm run guard:md",
     "guard:md": "! grep -rnF --include=*.md --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git '\\*\\*' .",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run build && artifact-check",
     "changeset": "changeset",
     "version:packages": "changeset version",
     "release": "npm run build && changeset publish"
