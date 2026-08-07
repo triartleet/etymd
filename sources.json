@@ -13,7 +13,7 @@
       "private": true,
       "role": "reference",
       "shape": "Nx monorepo / Next.js",
-      "note": "monorepo topology coverage: meta-vs-narrow command classification, a reuse-first inventory doc, and an advisory AI-review CI job"
+      "note": "monorepo topology coverage: meta-vs-narrow command classification and a reuse-first inventory doc"
     },
     {
       "name": "spa-bff",
@@ -47,8 +47,8 @@
       "name": "oss-fork",
       "private": true,
       "role": "reference",
-      "shape": "pnpm + Bun fork of an active upstream OSS assistant",
-      "note": "large claim-rich surface: 29KB CLAUDE.md, symlinked+gitignored AGENTS.md, husky; the fork-scoping case"
+      "shape": "fork of an active upstream OSS project",
+      "note": "claim-rich surface: large inherited instruction layer, symlinked+gitignored AGENTS.md, husky; the fork-scoping case"
     }
   ]
 }

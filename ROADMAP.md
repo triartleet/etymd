@@ -11,12 +11,12 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
   extensionless-token=prose, workspace-relative resolution); the `yarn nx` class (nx-monorepo 1→0) —
   a command that resolves to an installed `node_modules/.bin` binary is true, not a stale script,
   and is unverifiable (skipped + disclosed) when `node_modules` is absent; and the workspace-fullstack-main
-  pass (4→2, 2026-07-25): dotted prose like Better-Auth's `create/update.after` needs a
-  _recognized_ extension to be a file claim, and a missing-but-gitignored claim (`apps/api/.env`)
+  pass (4→2, 2026-07-25): dotted hook-notation prose like `create/update.after` needs a
+  _recognized_ extension to be a file claim, and a missing-but-gitignored claim (a gitignored env file)
   is machine-local — unverifiable, skipped + disclosed. Current corpus baseline: workspace-fullstack 2
   (context-economy, real), cra-legacy 4, spa-bff 5 (3 real stale-path), nx-monorepo 0. **First external gate is
   live:** the workspace-fullstack corpus repo’s pre-push hook runs `etymd audit --fail-on risk` via the sibling checkout
-  (an external MR) — the CI half follows once etymd has a remote.
+  — the CI half follows once etymd has a remote.
 
 ### Shipped since 003
 
@@ -49,8 +49,8 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
     nx-monorepo 0, spa-bff 5, cra-legacy 4, vscode-extension 0, docs-only 0), so no real finding was skipped away.
 
 - **Corpus grown to 7** (2026-07-26): vscode-extension (first etymd-scaffolded contract in daily
-  use), docs-only (docs-only, no manifest), oss-fork (large fork, 29KB CLAUDE.md, symlinked
-  AGENTS.md — onboarding pending). First `init` dogfood immediately caught two classes, both
+  use), docs-only (docs-only, no manifest), oss-fork (large fork with a claim-rich inherited
+  instruction layer — onboarding pending). First `init` dogfood immediately caught two classes, both
   fixed at the source: the scaffold's frameworks fallback claimed `see package.json` in repos
   that have none (pack v2), and husky v9's `.husky/_` hooksPath misread as a custom hook setup.
 
@@ -87,8 +87,8 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
 - **Context-economy deepening**: measure the delta an extraction actually buys (before/after
   words/tokens per session), so the lens's advice carries a number. Budgets are now per-repo
   configurable, so the next question is what a _right_ budget is, not where it lives.
-- **AI-review gate harvest**: distill the two real advisory AI-review CI jobs living in the corpus
-  (one corpus repo’s AI-review job, and the Nx monorepo's advisory `ai review`) into a `gates --ci` generator.
+- **AI-review gate harvest**: distill the corpus's two advisory AI-review CI jobs into a
+  `gates --ci` generator.
 
 ## Later (only if the objective still leads)
 
@@ -116,7 +116,7 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
 1. **Claim the npm name** — `etymd` verified available 2026-07-24; the hold is squat exposure.
    First publish claims it (no placeholder-squatting; publish the real 0.0.1).
 2. `package.json`: add `repository` / `homepage` / `bugs` once a remote exists; review the
-   `author` field for the public identity the owner wants.
+   `author` field before first publish.
 3. Activate CI (`.github/workflows/ci.yml` is ready; needs the GitHub remote).
 4. Competitive re-check: has agnix / agents-lint added baselines, ledgers, or budgets since
    July 2026? Positioning in 003 assumes they have not.
@@ -125,10 +125,10 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
 ## Known limitations (accepted trade-offs, not bugs)
 
 - **Extensionless file references go unchecked.** `lib/barcode-scan` (no extension, no trailing
-  slash) is treated as prose — the rule that killed the `research/trust` / `milestone/mNN`
+  slash) is treated as prose — the rule that killed the extensionless-prose-path
   false-positive class. A dir claim needs a trailing `/`; a file claim needs a _recognized_
   extension (`KNOWN_EXTENSIONS` in claims.ts — an unknown suffix like `.after` is prose, the
-  rule that killed the Better-Auth hook-notation class). A real file with an exotic extension
+  rule that killed the dotted hook-notation class). A real file with an exotic extension
   goes unchecked as the accepted cost.
 - **Create-this path claims are never accused.** When every mention of a path sits in prose that
   instructs creating/generating/writing it, the repo is right to lack it. The cost: a genuinely

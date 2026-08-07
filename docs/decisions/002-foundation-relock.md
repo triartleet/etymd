@@ -7,7 +7,7 @@ where they disagree, this document wins._
 
 Before building further on v0.0.1, the whole utility went through a three-agent adversarial E2E
 review — product/strategy, architecture/code, and corpus-reality (validated file-by-file against
-workspace-fullstack plus the three private team repos). The reviews converged on four foundation gaps,
+the corpus repos). The reviews converged on four foundation gaps,
 a verified defect cluster, and one strategic correction. The owner locked three decisions and this
 rework implemented them. Cost accepted deliberately: better to re-lock early than to discover the
 gap under a mature implementation.
@@ -63,7 +63,7 @@ against the baseline — previously every look at the project reset what "drift"
   includes, script-less jobs; GitHub workflows; tool registry; thresholds), then gap findings in
   three classes: **CI-only** (shift-left — the lead finding; `clothaid gates` is the paired fix),
   **local-only** (bypass — suppressed when unreadable inherited templates might run the check),
-  **latent** (coverage collected but no local threshold — the legacy-CRA case; commitlint unwired).
+  **latent** (coverage collected but no local threshold — the script-less-coverage case; commitlint unwired).
   **Honesty rules are structural:** `allow_failure`/`continue-on-error` ⇒ advisory, never an
   enforced gate; org-template `include:`s ⇒ disclosed as unseen inventory; server-side Sonar
   thresholds ⇒ phrased as living on the server with no local mirror; script-less jobs ⇒
@@ -98,13 +98,13 @@ team repos on solo rituals (state doc, session archive, failure register).
 clothaid now carries its own `AGENTS.md` (this standard, hand-completed), `CLAUDE.md` pointer,
 wired `.githooks` (format:check + typecheck + test on pre-push), and a CI workflow ready for a
 remote. The corpus smoke tests in `test/corpus.test.ts` are the regenerate-and-verify harness's
-first embodiment — they already caught one real miss (a script-less coverage job in the legacy CRA repo) during this
+first embodiment — they already caught one real miss (a script-less coverage job in a corpus repo) during this
 rework.
 
 ## Deferred (recorded, not lost)
 
 - `metrics` (ingest workspace-fullstack's `loop-metrics.mjs` output) — next after the gate lens beds in.
-- Harvesting the two real AI-review CI jobs (one corpus repo’s AI-review job, and an advisory `ai review` job in the Nx monorepo) into pack
+- Harvesting the two real AI-review CI jobs (two corpus repos' advisory AI-review jobs) into pack
   templates for `gates --ci`.
 - `context` as a measured lever (perform/track extraction, before/after deltas), `harvest`,
   `dashboard`, `session`, `profile`, extra adapters — designed in 001 §6, unscheduled.

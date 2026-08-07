@@ -226,7 +226,7 @@ The residue that genuinely needs a program is thin and already served twice:
 - **"do the tests pass", "is typecheck clean"** — gates and CI. `gate-integrity` already reasons
   about these without running them; an audit tool asserting them would duplicate the gate it tells
   you to install.
-- **bespoke org policy** (the 168-line archive-guard class) — `.githooks/*.local`, which runs at
+- **bespoke org policy** (an archive-guard hook) — `.githooks/*.local`, which runs at
   commit time with no consent model because the user invoked git.
 
 If someone shows a check that is not a predicate, not a gate, and not a hook, that is the evidence

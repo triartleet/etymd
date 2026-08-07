@@ -71,7 +71,7 @@ describe.skipIf(!hasRepo("workspace-fullstack"))(
   },
 )
 
-describe.skipIf(!hasRepo("nx-monorepo"))("corpus: nx-monorepo (Nx team repo)", () => {
+describe.skipIf(!hasRepo("nx-monorepo"))("corpus: nx-monorepo (Nx corpus repo)", () => {
   it("classifies the narrow unit command, never the meta runner or a writer", async () => {
     const facts = await scanProject(repo("nx-monorepo"))
     expect(facts.workspace.kind).toBe("nx")
@@ -86,7 +86,7 @@ describe.skipIf(!hasRepo("nx-monorepo"))("corpus: nx-monorepo (Nx team repo)", (
   })
 })
 
-describe.skipIf(!hasRepo("spa-bff"))("corpus: spa-bff (SPA + BFF team repo)", () => {
+describe.skipIf(!hasRepo("spa-bff"))("corpus: spa-bff (SPA + BFF corpus repo)", () => {
   it("sees the narrow test command and the pre-assembled no-jest trio", async () => {
     const facts = await scanProject(repo("spa-bff"))
     expect(facts.commands.test).toBe("test:unit")
@@ -163,7 +163,7 @@ describe.skipIf(!hasRepo("oss-fork"))("corpus: oss-fork (large fork, symlinked c
     expect(facts.artifacts.find((a) => a.id === "agents")?.exists).toBe(true)
   })
 
-  it("truth lens survives the 29KB claim-rich CLAUDE.md read-only", async () => {
+  it("truth lens survives the large claim-rich CLAUDE.md read-only", async () => {
     const root = repo("oss-fork")
     const facts = await scanProject(root)
     const report = await instructionTruthLens.run({

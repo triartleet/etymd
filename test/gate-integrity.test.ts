@@ -45,7 +45,7 @@ describe("expandScriptRefs / matchTools", () => {
     expect(() => expandScriptRefs("yarn a", cyclic)).not.toThrow()
   })
 
-  // Every shape below was found live in the owner's own hooks and CI files. The previous
+  // Every shape below was found live in real repos. The previous
   // positional regex handled only `npm run x`, `yarn x` and `pnpm x`; the rest expanded to
   // nothing, so a hook running `pnpm run typecheck` reported as having no typecheck at all.
   const SCRIPTS = {
@@ -106,8 +106,8 @@ describe("expandScriptRefs / matchTools", () => {
   })
 })
 
-// The cra-legacy-shaped fixture, faithful to the real private repo: sonar job with NO local script (it lives
-// in the org template) but SONAR_* variables + allow_failure; husky-v3 + lint-staged
+// The cra-legacy shape: a sonar job with NO local script (it lives
+// in an org template) but SONAR_* variables + allow_failure; husky-v3 + lint-staged
 // prettier-only locally; coverage collected but no threshold; commitlint installed but unwired;
 // an org include the tool cannot read; !reference tags that must not break parsing.
 const LEGACY_SPA_CI = `

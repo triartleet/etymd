@@ -346,7 +346,7 @@ Two files beside each other — the split is the privacy model:
 {
   "registryVersion": 1,
   "root": "~/projects", // ~ expands on the consumer side — never a machine home
-  "orientation": { "root": "north" }, // optional: the entry every other entry is guided by
+  "orientation": { "root": "notes" }, // optional: the entry every other entry is guided by
   "projects": [
     {
       "name": "web-app",

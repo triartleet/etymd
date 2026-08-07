@@ -1,30 +1,30 @@
 # Design: clothaid — an agent-agnostic agentic-workflow CLI
 
-> Founding design document (v0.0.1). Distilled from a frontrunner project workflow plus lessons
-> from three private team repos — an Nx monorepo, a SPA + BFF app, and a legacy CRA app. Tool name
+> Founding design document (v0.0.1). Distilled from a mature frontrunner project's workflow plus
+> lessons from a corpus of other real repos spanning several shapes. Tool name
 > **`clothaid`** (npm-available).
 > "Reckon" is kept only as the name of the _scan step / knowledge-index artifact_; the binary is
 > `clothaid`. This captures the design; the build follows in a later session.
 
 ## Context — why we're building this
 
-workspace-fullstack (the frontrunner project) has, over 122 sessions, converged a **locked agentic
+workspace-fullstack (the frontrunner project) has, over many sessions, converged a **locked agentic
 workflow**: an operating contract (`AGENTS.md`), ground-truth state (`PROJECT_CONTEXT.md`), a
-navigation map (now a `repo-map` skill), composition-point seams, a session-archive protocol
-(R5), structure/navigation rules (R1–R9), a three-tier gate model (process→pre-commit ·
+navigation map (now a `repo-map` skill), composition-point seams, a session-archive protocol,
+structure/navigation rules, a three-tier gate model (process→pre-commit ·
 correctness→pre-push/CI · AI-judgment→advisory), a `failure-modes` register, a canvas format,
 and comment discipline — all agent-agnostic (read by Claude Code via a `CLAUDE.md` pointer and by
-Cursor natively). The same skeleton was hand-ported into two team repos — an **Nx monorepo** and a
-**SPA + BFF** app (`AGENTS.md` plus a `.github/copilot-instructions.md` pointer, reuse-first with an
-inventory doc, an org-tooling leash, "Done =" gates) — and partially into a **legacy CRA** app.
+Cursor natively). The same skeleton was then ported by hand into other real repos of very
+different shapes, fully in some and partially in others — enough to prove both the demand and
+the cost: every port is manual, and nothing keeps a port true after it lands.
 There is concrete demand for exactly this as a **portable kit — a setup CLI** — with **measured**
-delivery gains against a deadline, which is what makes it worth building rather than re-porting.
+delivery gains, which is what makes it worth building rather than re-porting.
 
 Today that port is manual: the owner links documents into a session and asks an agent to copy the
 setup. The need: **a CLI that reckons any project and installs/optimises this workflow for it,
 agent-agnostic, and keeps adding value + growing its own knowledge from the source projects.**
 
-**North-star framing (leverage lens).** The single biggest N× lever this tool can pull is
+**Framing (leverage lens).** The single biggest lever this tool can pull is
 **context economy on a measured loop**: workspace-fullstack proved context is ~85% of loop spend and that
 extracting the map into a skill cut always-loaded context −52% _forever_. A generic scaffolder
 installs files; clothaid installs a **measured, self-auditing, context-lean discipline** and
@@ -42,16 +42,15 @@ knowledge harvest, and gates.
 
 ## 2. Repo & corpus (decided)
 
-- **New repo**: `~/projects/clothaid` (own release cadence; must not couple an agent-agnostic
-  product to workspace-fullstack's history).
+- **New repo**: a sibling checkout of its own (own release cadence; must not couple an
+  agent-agnostic product to workspace-fullstack's history).
 - **Sibling-path corpus**: a `sources.json` manifest pointing at local siblings — the workspace-fullstack
-  frontrunner plus the three private team repos. No vendoring/submodules; works today because all
-  repos are siblings.
+  frontrunner plus the other corpus repos. No vendoring/submodules; works today because the
+  corpus repos are local checkouts.
 - **Dogfooding validation loop** (core to development): regenerate workspace-fullstack's real artifacts from
   clothaid and **diff against the hand-built originals** — the tool is "correct" when it can
   reproduce the frontrunner's locked setup. Each corpus repo also validates a _different shape_:
-  pnpm-workspace TanStack (workspace-fullstack), Nx monorepo Next.js, single-repo SPA + Express BFF, and
-  CRA + Apollo + husky/lint-staged.
+  package topology, framework, command set, and hook setup all differ across them.
 
 ## 3. Core architecture — four building blocks
 
@@ -76,8 +75,8 @@ inventory, ownership boundaries, "what this project is").
 ### 3c. Agent-agnostic adapter layer (the mechanism that makes it "agnostic")
 
 **One source of truth** (`AGENTS.md` + `PROJECT_CONTEXT.md` + `docs/` + skills) and **thin,
-generated pointer/adapter files per agent target** — exactly workspace-fullstack's `CLAUDE.md → @AGENTS.md`
-and the team repos' `.github/copilot-instructions.md` pattern, generalized:
+generated pointer/adapter files per agent target** — exactly the pointer-file pattern proven in
+the corpus (`CLAUDE.md → @AGENTS.md`, `.github/copilot-instructions.md`), generalized:
 
 - **Claude Code**: `CLAUDE.md` pointer, `.claude/skills/*`, `.claude/settings.json` (hooks).
 - **Cursor**: native `AGENTS.md` + `.cursor/rules/*`.
@@ -92,8 +91,8 @@ A machine-usable + prose-rendered policy with three input sources (§5c): **auto
 tests? arbitrary bash? network? push/commit/open-PRs?), **tooling** (gh allowed? MCP allowed? API
 tokens?), **VCS discipline** (branch/commit format, ticket-linked changes), **scope** (minimal
 diffs, out-of-scope-file ban), **secrets/security**, **review/human-in-loop gates**. Rendered into
-the contract's "Working rules"/"leash" section; the team repos' org-tooling block is the proof this
-generalizes.
+the contract's "Working rules"/"leash" section; an org-tooling block already live in the corpus
+is the proof this generalizes.
 
 ## 4. The pipeline (top-level flow)
 
@@ -138,9 +137,8 @@ protocol? gate tiers? failure register? comment discipline? leash?).
 
 ### 5c. Leash (three sources; user-specific always asked — decided)
 
-- **Detected** (auto): infer likely constraints from the scan (GitLab + no `gh` → org VCS; husky
-  commitlint → enforced commit format; no MCP config → assume none) — the team-repo leash is exactly
-  this shape.
+- **Detected** (auto): infer likely constraints from the scan (a restricted VCS host → org VCS;
+  husky commitlint → enforced commit format; no MCP config → assume none).
 - **Our suggestions** (gap-driven): where the standard has a knob the project hasn't answered, ask.
 - **User-specific** (always): an open capture of the user's own constraints, folded into the rules.
 
@@ -159,34 +157,33 @@ Each is a standalone command; the **dashboard** is their shared keyless front-en
 
 ### 6a. Doctor / freshness (`clothaid doctor`)
 
-Re-runnable audit generalizing workspace-fullstack's `freshness-audit` skill + R1 map-staleness (the recurring
-team-repo pain): map lists files that no longer exist? documented commands still resolve? leash
+Re-runnable audit generalizing the frontrunner's `freshness-audit` skill + map-staleness (a
+recurring real-repo pain): map lists files that no longer exist? documented commands still resolve? leash
 claims ("gh not allowed") still true? "blocked-on" claims still true? canvas/status vs the actual
 tree? **CI-installable** to fail on drift. Feeds the dashboard.
 
 ### 6b. Metrics / measurement (`clothaid metrics`)
 
 Instruments the loop — session weight, iteration count, reversals, rework %, revert %, lead
-time/story vs a baseline — generalizing workspace-fullstack's A4 instrument (`scripts/loop-metrics.mjs` →
-`agentic-metrics-baseline.md`). **Directly powers the manager-proposal December case study.**
+time/story vs a baseline — generalizing the frontrunner's existing loop-metrics instrument.
 Fed automatically by the **session runner** (§6f) so measurement is free, not a chore. Strict-by-
-default methodology (matched comparisons, named limits) mirroring the proposal.
+default methodology (matched comparisons, named limits).
 
 ### 6c. Harvest / knowledge growth (`clothaid harvest`)
 
 The **upstream feedback loop** — automate-expansion. Reads the _evolved_ contracts/skills/
 failure-modes of the corpus repos, **diffs vs the current knowledge pack**, and **proposes
 human-approved updates** to the pack (new rule, new failure mode, refined template) → a new pack
-version. This is how the tool learns from workspace-fullstack and the team repos continuing to evolve.
+version. This is how the tool learns from the corpus repos continuing to evolve.
 
 ### 6d. Gates (`clothaid gates`) — split by cost
 
 - **Free tier, always project-agnostic**: install the tracked-hooks gate model — `process →
 pre-commit`, `correctness → pre-push` (format/types/lint over the working tree) — via
   `.githooks/` + `core.hooksPath` (workspace-fullstack's multi-agent-safe, git-level pattern). **No keys.**
-- **Opt-in AI-review CI job** (`--ci`): the `AI-judgment → advisory` MR/PR review that the team repos
-  already run — **bring-your-own-key**, auto-detects an existing CI AI-review setup (free on the
-  corpus projects), skipped cleanly where no key/CI exists. Never a hard requirement.
+- **Opt-in AI-review CI job** (`--ci`): an `AI-judgment → advisory` PR review of the kind already
+  proven in the corpus — **bring-your-own-key**, auto-detects an existing CI AI-review setup (free
+  on the corpus projects), skipped cleanly where no key/CI exists. Never a hard requirement.
 
 ### 6e. Operational dashboard (`clothaid dashboard`)
 
@@ -205,15 +202,15 @@ consumes — measurement becomes a side effect of working, not extra work.
 ### 6g. Context-budget accounting (`clothaid context`) — **flagship differentiator**
 
 Measures the **always-loaded footprint** (contract + pointers + auto-loaded skills, in words/
-tokens), flags bloat, and proposes the **skill-extraction move** (map → skill) that cut workspace-fullstack's
-context −52% forever. Context is ~85% of loop spend (workspace-fullstack's own finding) — this is the measured
-N× lever no generic tool offers. Also guards regressions (a contract that re-bloats trips doctor).
+tokens), flags bloat, and proposes the **skill-extraction move** (map → skill) whose measured
+gains are in the Context section above — the lever no generic tool offers. Also guards
+regressions (a contract that re-bloats trips doctor).
 
 ### 6h. Org profiles (`clothaid profile`)
 
 Leash profiles + knowledge-pack overlays are **shareable across repos**. Define an org leash once
-(e.g. gh-disabled · MCP-disabled · ticket discipline · commitlint format · GitLab CI) and apply
-across every repo — the **multi-repo scale story** the "broader AI-enablement" ambition needs.
+(e.g. a restricted VCS host · disabled tooling · ticket discipline · an enforced commit format)
+and apply across every repo — the **multi-repo scale story**.
 
 ### 6i. Onboarding brief (`clothaid brief --human`)
 
@@ -262,7 +259,7 @@ clothaid dashboard       # keyless local metrics/status surface
 - All three modes with scorecards, sharing one engine (§5b).
 - Leash capture (detected + suggested + user-specific) (§5c).
 - Plan/Apply diff-first + idempotent (§5d).
-- Adapter layer for **Claude Code + Cursor + Copilot** (the owner's three environments) (§3c).
+- Adapter layer for **Claude Code + Cursor + Copilot** (the three initial targets) (§3c).
 - Free gates tier (local hooks) (§6d).
 
 **Fast-follow (v0.0.x, designed now, built next):** doctor, metrics + session runner, context
@@ -271,9 +268,9 @@ adapters, networked failure-modes. (Ordering set when we move from design to bui
 
 ## 10. Verification / dogfooding (how we know it works)
 
-- **Corpus reproduction**: run against `../workspace-fullstack` and diff generated vs hand-built `AGENTS.md`/
-  map-skill/gates — the frontrunner is the golden fixture.
-- **Shape coverage**: run against the Nx monorepo, the SPA + BFF app, and the legacy CRA app —
+- **Corpus reproduction**: run against the frontrunner checkout and diff generated vs hand-built
+  `AGENTS.md`/map-skill/gates — the frontrunner is the golden fixture.
+- **Shape coverage**: run against each of the other corpus repos —
   each exercises a different topology/command-set/hook-setup the scan must get right.
 - **Self-setup**: `clothaid` installs its own workflow into its own repo (dogfood).
 - **Mode coverage**: Fresh on a scratch repo; Migration/Optimisation on a corpus repo with its
@@ -282,7 +279,7 @@ adapters, networked failure-modes. (Ordering set when we move from design to bui
 ## 11. Open decisions for the owner
 
 1. ~~Name~~ — **decided: `clothaid`** (npm-available, owner-confirmed).
-2. **Adapter target list for v0.0.1** — assumed Claude Code + Cursor + Copilot (the owner's three);
-   confirm none others are needed on day one.
+2. **Adapter target list for v0.0.1** — assumed Claude Code + Cursor + Copilot (the initial
+   three); confirm none others are needed on day one.
 3. **Fast-follow ordering** — set when design → build (leaning: doctor + session-runner + metrics
    - context first, since they compound and feed the dashboard).
