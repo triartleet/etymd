@@ -282,14 +282,14 @@ Against _"would a user who is not us ever set this?"_ — verdicts are the INTEN
 items marked **demote** or **delete** are not yet applied and remain live until the properties
 migration (sequencing step 6) runs.
 
-| feature          | verdict                                                                                             |
-| ---------------- | --------------------------------------------------------------------------------------------------- |
-| `screen`         | **keep** — mechanism ships, policy is the user's, zero bundled patterns                             |
-| `publishRoute`   | **keep** — npm vs vsce is a fact about the world                                                    |
-| fleet gate-drift | **keep** — "do my repos have the hooks I think they do" is general                                  |
-| `publishable`    | **keep, rename** — it measures "npm would publish this", not a judgment                             |
-| `trust`          | **demote** — the needle check is general; the three-level vocabulary is ours                        |
-| `profile`        | **delete (pending)** — to be replaced by `aliasOnly` / `localOnly`; 14 entries still carry it today |
+| feature          | verdict                                                                                                  |
+| ---------------- | -------------------------------------------------------------------------------------------------------- |
+| `screen`         | **keep** — mechanism ships, policy is the user's, zero bundled patterns                                  |
+| `publishRoute`   | **keep** — npm vs vsce is a fact about the world                                                         |
+| fleet gate-drift | **keep** — "do my repos have the hooks I think they do" is general                                       |
+| `publishable`    | **keep, rename** — it measures "npm would publish this", not a judgment                                  |
+| `trust`          | **demote** — the needle check is general; the three-level vocabulary is ours                             |
+| `profile`        | **delete (pending)** — to be replaced by `aliasOnly` / `localOnly`; the type is still live in the source |
 
 ## Non-goals (deliberate, standing)
 
