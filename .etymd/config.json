@@ -1,0 +1,8 @@
+{
+  "gates": {
+    "commands": ["format:check","typecheck","test"],
+    "_why": {
+      "commands": "Pinned so a pack regeneration cannot silently drop test — it is derived from the PREVIOUS hook, so deleting the hook loses it."
+    }
+  }
+}

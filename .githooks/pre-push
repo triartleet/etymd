@@ -13,6 +13,30 @@ echo "› npm run typecheck"
 npm run typecheck || exit 1
 echo "› npm run test"
 npm run test || exit 1
+# Shell correctness. Scripts are discovered by shebang over TRACKED files at push time, so a
+# script added later is covered without regenerating this hook.
+if command -v shellcheck >/dev/null 2>&1; then
+  scripts=$(git ls-files -z \
+    | xargs -0 -I{} sh -c 'head -1 "{}" 2>/dev/null | grep -qE "^#!.*[/ ](ba|da|z)?sh( |$)" && echo "{}"' \
+    | sort)
+  if [ -n "$scripts" ]; then
+    echo "› shellcheck ($(printf '%s\n' "$scripts" | wc -l | tr -d ' ') scripts, blocking at severity=warning)"
+    printf '%s\n' "$scripts" | xargs shellcheck -S warning || {
+      echo "  fix, or justify inline with '# shellcheck disable=SCxxxx  # why'"
+      exit 1
+    }
+    # Everything below the blocking bar, shown once the push is already cleared. Never affects
+    # the exit code — advice that can fail a push is not advice.
+    advice=$(printf '%s\n' "$scripts" | xargs shellcheck -S style -f gcc 2>/dev/null \
+      | grep -v ': warning:\|: error:' || true)
+    if [ -n "$advice" ]; then
+      echo "  · style/info (not blocking):"
+      printf '%s\n' "$advice" | sed 's/^/    /'
+    fi
+  fi
+else
+  echo "› shellcheck skipped (not on PATH) — install it to gate this repo's shell scripts"
+fi
 
 if command -v etymd >/dev/null 2>&1; then
   echo "› etymd audit --fail-on risk"
