@@ -1,5 +1,26 @@
 # etymd
 
+## 0.3.2
+
+### Patch Changes
+
+- A truth finding from any lens now reaches a `doctor` run.
+
+  `doctor` filters to truth-only, and it used to filter at the **lens** level — so `gate-integrity`
+  (an improvement lens) was skipped entirely, and its `hooks-not-wired` finding (tier: risk —
+  "tracked hooks exist but never run") was invisible in the one view meant to catch it. The lens
+  label was never the right granularity: a lens can emit both kinds, and "hooks exist and are
+  unwired" is as objective as anything the truth lens reports.
+
+  `kind` now lives on the Finding, defaulting to the lens kind when a finding does not set its
+  own, and the `--truth` filter operates at the finding level. Every lens still runs under
+  `--truth`; findings are filtered afterward, so nothing objective is invisible.
+
+  Also in this release: CI proves the publish tarball's exact manifest on every push (packagers
+  ignore `.gitignore`, so a stray local file can ship while every git-scoped check stays green),
+  and the generated hook companions (`.githooks/<hook>.local`) ship in this repo as a worked
+  example of the resolve-by-name convention.
+
 ## 0.3.1
 
 ### Patch Changes
