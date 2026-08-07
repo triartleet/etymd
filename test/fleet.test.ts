@@ -1027,7 +1027,7 @@ describe("fleet add — the corp perimeter", () => {
     expect(doc.projects[0].private).toBe(true)
   })
 
-  it("leaves a non-corp remote on the personal path, remote recorded", async () => {
+  it("lets a non-corp remote through on the personal path", async () => {
     const target = await repoWithRemote("mine", "git@github.com:me/thing.git")
     const manifestPath = await writeHub([], {
       local: { machineProfile: "corp", dirs: {}, corpHosts: [CORP] },
@@ -1039,9 +1039,12 @@ describe("fleet add — the corp perimeter", () => {
       trust: "private",
       yes: true,
     })
+    // The guard must refuse corp hosts ONLY — an ordinary remote registers normally. The URL
+    // itself is no longer recorded (see "the manifest records no remote"), so what this pins is
+    // that registration SUCCEEDS, not that the remote survives.
     const doc = JSON.parse(await fs.readFile(manifestPath, "utf8"))
     expect(doc.projects[0].profile).toBe("personal")
-    expect(doc.projects[0].remote).toContain("github.com")
+    expect(doc.projects[0].name).toBe("thing")
   })
 })
 
@@ -1116,5 +1119,35 @@ describe("fleet add — corp registration writes both halves", () => {
       await fs.readFile(path.join(path.dirname(manifestPath), "registry.local.json"), "utf8"),
     )
     expect(local.dirs).toEqual({})
+  })
+})
+
+describe("fleet add — the manifest records no remote", () => {
+  it("PINNED: never writes a remote URL into the tracked manifest", async () => {
+    // The remote was write-only metadata that nothing consumed, and it was the field that made
+    // a mis-profiled entry a real disclosure: a URL carries the host and the internal group
+    // path, where `path` carries only a directory name. Not recording it retires that class
+    // without a host-matching heuristic, and works where no local manifest exists at all.
+    await initRepo("plain")
+    const target = path.join(dir, "plain")
+    await gitIn(target, null, ["remote", "add", "origin", "git@github.com:me/plain.git"])
+    const manifestPath = await writeHub([], { local: { machineProfile: "corp", dirs: {} } })
+
+    await add({
+      cwd: path.dirname(manifestPath),
+      target,
+      name: "plain",
+      trust: "private",
+      yes: true,
+    })
+
+    const doc = JSON.parse(await fs.readFile(manifestPath, "utf8"))
+    expect(doc.projects[0]).not.toHaveProperty("remote")
+    // The rest of the entry is unchanged — this removes a field, not the registration.
+    expect(doc.projects[0].name).toBe("plain")
+    expect(doc.projects[0].trust).toBe("private")
+    expect(doc.projects[0].path).toBe("plain")
+    // And no URL leaked in under any other key.
+    expect(JSON.stringify(doc)).not.toContain("github.com")
   })
 })

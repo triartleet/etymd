@@ -531,9 +531,13 @@ export async function add(opts: FleetAddCmdOptions): Promise<void> {
           trust,
           contract: {},
           links: {},
-          // The scan does not collect remotes (they are not a workflow fact), so read it here —
-          // recorded when present, simply absent when the repo has no origin yet.
-          ...(remote ? { remote } : {}),
+          // The remote is deliberately NOT recorded. Nothing reads it — it was persisted only
+          // because it happened to be derivable — and it is the field that turns a mis-profiled
+          // entry into a disclosure: a raw URL carries the host AND the internal group path,
+          // while `path` carries a bare directory name. Removing a field no consumer reads
+          // retires that whole class without any host-matching guess, and keeps working on a
+          // machine that has no local manifest for the corp-host guard above to read.
+          // It stays derivable at any time from the checkout itself, which is where it came from.
         }
 
   print(`  ${glyph.bullet} ${theme.dim("entry")}`)
