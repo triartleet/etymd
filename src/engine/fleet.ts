@@ -653,6 +653,15 @@ async function checkGateDrift(
     // different hook path entirely, and `git` runs exactly one. Reporting either would be noise
     // that never resolves.
     if (entry.profile === "corp" || entry.private) continue
+    // A declared absence is a state, not a gap. Wall findings are deliberately not
+    // ledger-quietable (004), which is right for leak and partition conditions — their only
+    // honest resolution is fixing them — but wrong for a repo that legitimately has nothing to
+    // gate, or gates itself by hand. Without honoring the declaration, a settled decision is
+    // re-reported on every sweep until the whole report is ignored.
+    if (entry.gates === "none") {
+      disclosures.push(`${entry.name}: gates declared \`none\` — deliberately absent, not missing`)
+      continue
+    }
 
     const facts = await scanProject(root)
     if (!facts.git.isRepo) continue

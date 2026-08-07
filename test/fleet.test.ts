@@ -871,6 +871,24 @@ describe("fleet gate drift", () => {
     expect(missing?.evidence.join(" ")).toContain("commit-msg")
   })
 
+  it("PINNED: honours a declared `gates: none` as a state, not a gap", async () => {
+    // Wall findings are deliberately not ledger-quietable (004) — correct for leak and partition
+    // conditions, whose only honest resolution is fixing them, but wrong for a repo that
+    // legitimately has nothing to gate. Without honoring the declaration a settled decision is
+    // re-reported on every sweep until the whole report gets ignored.
+    await initRepo("prose")
+    const manifestPath = await writeHub([personal("prose", { gates: "none" })])
+    const { findings, disclosures } = await collectWallFindings(await manifestAt(manifestPath))
+    expect(findings.some((f) => f.id.includes("gate-"))).toBe(false)
+    expect(disclosures.join(" ")).toContain("deliberately absent")
+
+    // An UNdeclared absence still reports — silence has to be earned by declaring it.
+    await initRepo("undeclared")
+    const bare = await writeHub([personal("undeclared")])
+    const res = await collectWallFindings(await manifestAt(bare))
+    expect(res.findings.some((f) => f.id === "fleet-manifest/gate-missing:undeclared")).toBe(true)
+  })
+
   it("does not flag expected per-repo variation as drift", async () => {
     // Regenerating from each repo's OWN facts is what makes this safe: two repos with
     // different package managers produce different hooks and both are correct.

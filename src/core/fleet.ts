@@ -82,6 +82,15 @@ export interface FleetEntry {
   /** A declared `trust` value outside the vocabulary — preserved verbatim so the check can name it. */
   trustRaw?: string
   staleAfterDays?: number
+  /**
+   * How this entry's git hooks are governed. `"none"` declares that generated gates are
+   * deliberately absent — a prose repo with nothing mechanically checkable, or one whose gate is
+   * hand-written on purpose. Wall findings cannot be quieted through the ledger (004: their only
+   * honest resolution is fixing them), which is right for leak and partition conditions but
+   * wrong for a state a fleet legitimately chooses; without this, a settled decision is
+   * re-reported on every sweep until the report is ignored.
+   */
+  gates?: string
   /** Per-entry state char-budget override (ships unset — the schema slot exists). */
   stateBudget?: number
   contract: FleetContract
@@ -251,6 +260,7 @@ function loadRegistryEntries(
       // An unknown value is NOT coerced to a default: trust gates content screening, so a typo
       // must surface as "undeclared" (a finding) rather than quietly picking an answer.
       trust: isFleetTrust(rec.trust) ? rec.trust : undefined,
+      gates: asString(rec.gates),
       trustRaw: asString(rec.trust),
       staleAfterDays: typeof rec.staleAfterDays === "number" ? rec.staleAfterDays : undefined,
       stateBudget: typeof rec.stateBudget === "number" ? rec.stateBudget : undefined,
