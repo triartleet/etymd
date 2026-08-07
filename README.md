@@ -1,11 +1,11 @@
 # Etymd
 
 <div align="center">
-  <img src="media/etymd-logo.png" width="520" alt="Etymd — a papyrus of written instructions, each line checked against the repository it describes">
+  <img src="https://raw.githubusercontent.com/triartleet/etymd/main/media/etymd-logo.png" width="520" alt="Etymd — a papyrus of written instructions, each line checked against the repository it describes">
   <p>
     <a href="https://www.npmjs.com/package/etymd"><img src="https://img.shields.io/npm/v/etymd.svg?label=npm&color=cb3837" alt="npm version"></a>
     <a href="https://github.com/triartleet/etymd/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/triartleet/etymd/ci.yml?branch=main&label=CI" alt="CI"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+    <a href="https://github.com/triartleet/etymd/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
   </p>
 </div>
 
@@ -335,7 +335,7 @@ agent-context file: claims about your fleet (what exists, where, under which **p
 side of the wall an entry belongs to, `personal` or `corp`; the **wall** is the placement
 boundary between personal and employer content that the sweep polices). It rots like any
 AGENTS.md does, and `etymd fleet` keeps it true. Decision record:
-[`docs/decisions/004-fleet-truth-guard.md`](docs/decisions/004-fleet-truth-guard.md). Both the
+[`docs/decisions/004-fleet-truth-guard.md`](https://github.com/triartleet/etymd/blob/main/docs/decisions/004-fleet-truth-guard.md). Both the
 registry schema and the fleet `--json` schema are **experimental through 0.2.x**.
 
 Two files beside each other — the split is the privacy model:
@@ -451,7 +451,7 @@ console.log(audit.findings) // one schema: claim · evidence · why · action ·
 ## The corpus (how this is validated)
 
 Etymd is developed against a corpus of real sibling repos rather than fixtures alone —
-[`sources.json`](sources.json) lists them by shape. Every heuristic here exists because a real
+[`sources.json`](https://github.com/triartleet/etymd/blob/main/sources.json) lists them by shape. Every heuristic here exists because a real
 repo proved the previous one wrong, and each skip class in the truth lens is a false positive that
 a corpus run caught.
 
@@ -469,10 +469,10 @@ Without it — on a fresh clone or in CI — those suites skip cleanly and the r
 
 ## Decision record & roadmap
 
-[`docs/decisions/`](docs/decisions/) — 001 founding · 002 foundation re-lock · **003 the truth-guard
+[`docs/decisions/`](https://github.com/triartleet/etymd/tree/main/docs/decisions) — 001 founding · 002 foundation re-lock · **003 the truth-guard
 pivot** (the current identity; includes the state-of-the-field investigation it rests on) ·
 **004 fleet mode** (the truth guard across your repositories).
-[`ROADMAP.md`](ROADMAP.md) — what's now / next / later, the pre-publish checklist, and the
+[`ROADMAP.md`](https://github.com/triartleet/etymd/blob/main/ROADMAP.md) — what's now / next / later, the pre-publish checklist, and the
 accepted heuristic trade-offs.
 
 ## License
