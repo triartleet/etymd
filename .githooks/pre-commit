@@ -1,16 +1,22 @@
 #!/usr/bin/env sh
 # etymd: process gate. Cheap, locally-knowable checks belong here (fast, blocks the commit).
 
-# Content gate: refuses to commit environment, employer, identity or cross-project detail
-# into a repository whose history is (or will be) public. The checker and its patterns are
-# machine-local by design — the patterns are themselves the strings being screened for — so
-# this hook is a no-op wherever the checker is not installed.
+# Repo-owned checks. This file is generated and will be overwritten; `.githooks/pre-commit.local`
+# is yours — etymd never reads, writes, or regenerates it. Put project-specific guards there.
+LOCAL="$(dirname "$0")/pre-commit.local"
+if [ -x "$LOCAL" ]; then
+  "$LOCAL" "$@" || exit 1
+fi
+
+# Content screen — staged file bytes. Refuses to commit environment, employer or identity
+# detail into a repo whose history is (or could become) public. The checker and its patterns
+# are machine-local by design, so this is a NO-OP wherever no checker is installed: safe to
+# commit anywhere, active only where you opted in.
 #
-# Enable by installing the checker, or point CONTENT_GATE at it.
 # Bypass, with a reason: git commit --no-verify
-GATE="${CONTENT_GATE:-$HOME/.local/bin/public-repo-check}"
+GATE="${CONTENT_GATE:-$(command -v etymd || true)}"
 if [ -x "$GATE" ]; then
-  "$GATE" || exit 1
+  "$GATE" screen --staged || exit 1
 fi
 
 exit 0

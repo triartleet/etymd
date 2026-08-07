@@ -97,7 +97,10 @@ export async function planWorkflow(
     )
     // A recorded command set is the user's decision and wins outright; otherwise derive, keeping
     // whatever the existing hook already ran.
-    const gateConfig: GateConfig | undefined = opts.gateConfig?.commands.length
+    // `?.commands?.length`, not `?.commands.length`: a hand-written config legitimately sets only
+    // `failOn`, and the type says `commands` is required while real input often omits it. A
+    // config the user wrote by hand must never crash the generator.
+    const gateConfig: GateConfig | undefined = opts.gateConfig?.commands?.length
       ? opts.gateConfig
       : {
           commands: derivedCommands(facts, existingPrePush ?? undefined),

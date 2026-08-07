@@ -1,11 +1,20 @@
 #!/usr/bin/env sh
-# Commit messages are published history too, and the staged-content gate cannot see them:
-# it reads `git diff --cached`, which is file bytes only. No-op where the checker is absent.
+# etymd: content screen — the commit message itself.
+#
+# The staged-content gate reads file bytes and never sees the message, yet a message is as
+# permanently published as any file. No-op where no checker is installed.
 #
 # Bypass, with a reason: git commit --no-verify
-GATE="${COMMIT_MSG_GATE:-$HOME/.local/bin/commit-msg-check}"
+GATE="${COMMIT_MSG_GATE:-$(command -v etymd || true)}"
 if [ -x "$GATE" ]; then
-  "$GATE" "$1" || exit 1
+  "$GATE" screen --message "$1" || exit 1
+fi
+
+# Repo-owned checks. This file is generated and will be overwritten; `.githooks/commit-msg.local`
+# is yours — etymd never reads, writes, or regenerates it. Put project-specific guards there.
+LOCAL="$(dirname "$0")/commit-msg.local"
+if [ -x "$LOCAL" ]; then
+  "$LOCAL" "$@" || exit 1
 fi
 
 exit 0

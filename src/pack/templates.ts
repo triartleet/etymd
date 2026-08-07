@@ -217,7 +217,9 @@ export function generatePrePushHook(facts: ProjectFacts, gates?: GateConfig): st
   const c = facts.commands
   // A recorded command set wins over the derivation: the guess is a starting point, and the one
   // edit that changes it must survive the next `etymd gates` run.
-  const candidates = gates?.commands.length ? gates.commands : [c.formatCheck, c.typecheck, c.lint]
+  // Optional chaining on `commands` too: a hand-written config may set only `failOn`, and the
+  // type claims the field is required while real input often omits it.
+  const candidates = gates?.commands?.length ? gates.commands : [c.formatCheck, c.typecheck, c.lint]
   const allowed = new Set(gates?.allowWriting ?? [])
   const steps = candidates
     .filter(
