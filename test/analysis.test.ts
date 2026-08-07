@@ -380,8 +380,14 @@ describe("shell correctness gate — the surface package.json cannot see", () =>
     // A high false-positive gate does not make a repo careful — it teaches --no-verify, and that
     // flag is shared with the content screen, which must never be bypassed.
     const hook = generatePrePushHook(facts({ shell: { scripts: 3 } }))
-    expect(hook).toContain("-S warning")
-    expect(hook).not.toContain("-S style")
+    // Only the warning pass may end the push. Asserting style is never MENTIONED pins the wrong
+    // property — and did: it is what let 0.4.0 ship with the advisory pass missing entirely,
+    // while the docs promised it.
+    // The warning pass is the only one wired to a failure branch...
+    expect(hook).toMatch(/-S warning \|\| \{[^}]*exit 1/)
+    // ...while the style pass is captured into a variable and explicitly tolerated with
+    // `|| true`, so it has no path to the exit code at all.
+    expect(hook).toMatch(/advice=\$\([\s\S]*?-S style[\s\S]*?\|\| true\)/)
   })
 
   it("stops claiming 'no correctness commands detected' when shell IS the surface", () => {
@@ -401,5 +407,23 @@ describe("shell correctness gate — the surface package.json cannot see", () =>
     expect(hook).toContain("pnpm typecheck")
     expect(hook).toContain("shellcheck")
     expect(hook.indexOf("typecheck")).toBeLessThan(hook.indexOf("shellcheck"))
+  })
+})
+
+describe("shell gate — sub-warning findings are shown, never enforced", () => {
+  it("emits an advisory pass, and it cannot change the exit code", () => {
+    // The published 0.4.0 documented this and did not do it: style findings were discarded
+    // entirely. A doc claiming behaviour the code lacks is the exact defect etymd's own
+    // instruction-truth lens exists to catch.
+    const hook = generatePrePushHook(facts({ shell: { scripts: 5 } }))
+    expect(hook).toContain("-S style")
+    expect(hook).toContain("style/info (not blocking)")
+    // `|| true` keeps a failing advisory pass from leaking a non-zero status into the hook.
+    expect(hook).toMatch(/-S style[\s\S]*\|\| true/)
+  })
+
+  it("orders the advisory pass AFTER the blocking one, so a real defect reports first", () => {
+    const hook = generatePrePushHook(facts({ shell: { scripts: 5 } }))
+    expect(hook.indexOf("-S warning")).toBeLessThan(hook.indexOf("-S style"))
   })
 })

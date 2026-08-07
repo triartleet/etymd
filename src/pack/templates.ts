@@ -225,9 +225,11 @@ exit 0
  * its binary is absent is the worst kind — the repo looks guarded on every machine, and is
  * guarded on one.
  *
- * The blocking bar is `warning`; style and info print as advice. A gate with a high false-positive
- * rate does not make a repo careful, it teaches everyone the bypass flag — and the flag is shared
- * with the gates that must never be bypassed.
+ * The blocking bar is `warning`; style and info print as advice AFTER the blocking pass. A gate
+ * with a high false-positive rate does not make a repo careful, it teaches everyone the bypass
+ * flag — and the flag is shared with the gates that must never be bypassed. Discarding the
+ * sub-warning findings instead of showing them would be the opposite mistake: the cheap ones are
+ * how a script gets better between defects, and they cost one extra pass over files already read.
  */
 function shellcheckStep(): string {
   return `
@@ -243,6 +245,14 @@ if command -v shellcheck >/dev/null 2>&1; then
       echo "  fix, or justify inline with '# shellcheck disable=SCxxxx  # why'"
       exit 1
     }
+    # Everything below the blocking bar, shown once the push is already cleared. Never affects
+    # the exit code — advice that can fail a push is not advice.
+    advice=$(printf '%s\\n' "$scripts" | xargs shellcheck -S style -f gcc 2>/dev/null \\
+      | grep -v ': warning:\\|: error:' || true)
+    if [ -n "$advice" ]; then
+      echo "  · style/info (not blocking):"
+      printf '%s\\n' "$advice" | sed 's/^/    /'
+    fi
   fi
 else
   echo "› shellcheck skipped (not on PATH) — install it to gate this repo's shell scripts"
