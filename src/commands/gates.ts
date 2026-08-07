@@ -41,9 +41,14 @@ function printGateSummary(
   source: { recorded: boolean; willRecord: boolean },
 ): void {
   const run = runPrefix(facts.packageManager)
-  const cmds = gates.commands.length
-    ? gates.commands.map((c) => `${run} ${c}`).join(", ")
-    : "none detected"
+  // The shell surface is a real step in the hook, so it belongs in the summary too — reporting
+  // "none detected" beside a gate that is about to check twelve scripts is the tool lying about
+  // its own output, and this summary is what "accept" is agreeing to.
+  const shellStep = facts.shell?.scripts
+    ? `shellcheck (${facts.shell.scripts} script${facts.shell.scripts === 1 ? "" : "s"})`
+    : ""
+  const listed = [...gates.commands.map((c) => `${run} ${c}`), ...(shellStep ? [shellStep] : [])]
+  const cmds = listed.length ? listed.join(", ") : "none detected"
   print(`  ${glyph.bullet} ${theme.dim("pre-push runs")} ${theme.info(cmds)}`)
   print(`  ${glyph.bullet} ${theme.dim("audit fails on")} ${theme.info(gates.failOn)}`)
   print(

@@ -345,3 +345,61 @@ describe("preservation is a property of generation, not of the command", () => {
     expect(freshHook).not.toMatch(/^pnpm test/m)
   })
 })
+
+describe("shell correctness gate — the surface package.json cannot see", () => {
+  it("writes a shellcheck step for a repo with a shell surface", () => {
+    const hook = generatePrePushHook(facts({ shell: { scripts: 12 } }))
+    expect(hook).toContain("shellcheck -S warning")
+    // Discovery happens IN the hook, at push time. A baked-in file list is correct the day it
+    // is generated and silently wrong the first time someone adds a script.
+    expect(hook).toContain("git ls-files")
+    expect(hook).not.toContain("bootstrap/")
+  })
+
+  it("omits the step entirely where there is no shell surface", () => {
+    const hook = generatePrePushHook(facts({ shell: { scripts: 0 } }))
+    expect(hook).not.toContain("shellcheck")
+  })
+
+  it("treats an absent `shell` fact as not-measured, not as zero", () => {
+    // A facts file written by an older etymd predates the field; regenerating from it must not
+    // crash, and must not claim a surface it never looked for.
+    const hook = generatePrePushHook(facts({ shell: undefined }))
+    expect(hook).not.toContain("shellcheck")
+  })
+
+  it("PINNED: a missing shellcheck binary skips LOUDLY and never blocks", () => {
+    // The failure this prevents: a gate that goes quiet when its tool is absent looks installed
+    // on every machine and is installed on one.
+    const hook = generatePrePushHook(facts({ shell: { scripts: 3 } }))
+    expect(hook).toContain("command -v shellcheck")
+    expect(hook).toContain("shellcheck skipped (not on PATH)")
+  })
+
+  it("PINNED: blocks at warning, so style pedantry never trains the bypass flag", () => {
+    // A high false-positive gate does not make a repo careful — it teaches --no-verify, and that
+    // flag is shared with the content screen, which must never be bypassed.
+    const hook = generatePrePushHook(facts({ shell: { scripts: 3 } }))
+    expect(hook).toContain("-S warning")
+    expect(hook).not.toContain("-S style")
+  })
+
+  it("stops claiming 'no correctness commands detected' when shell IS the surface", () => {
+    // The contradiction that motivated this: a repo of shell scripts was told it had nothing to
+    // check, one line above a step that checks it.
+    const hook = generatePrePushHook(facts({ commands: { raw: {} }, shell: { scripts: 9 } }))
+    expect(hook).not.toContain("no correctness commands detected")
+    expect(hook).toContain("shell is this repo's checkable surface")
+  })
+
+  it("keeps package scripts primary — shell is additive, not a replacement", () => {
+    const hook = generatePrePushHook(facts({ shell: { scripts: 4 } }), {
+      commands: ["typecheck"],
+      failOn: "risk",
+      allowWriting: [],
+    })
+    expect(hook).toContain("pnpm typecheck")
+    expect(hook).toContain("shellcheck")
+    expect(hook.indexOf("typecheck")).toBeLessThan(hook.indexOf("shellcheck"))
+  })
+})

@@ -212,6 +212,43 @@ exit 0
 `
 }
 
+/**
+ * The correctness gate for a repo whose executable surface is shell.
+ *
+ * Three properties, each a lesson from a gate that failed:
+ *
+ * Scripts are re-discovered HERE, at push time, by shebang over tracked files — never baked in as
+ * a list. A generated list is correct on the day it is written and wrong the first time someone
+ * adds a script, and the failure is silent: the new file is simply never checked.
+ *
+ * A missing `shellcheck` is a LOUD skip naming the install command. A check that goes quiet when
+ * its binary is absent is the worst kind — the repo looks guarded on every machine, and is
+ * guarded on one.
+ *
+ * The blocking bar is `warning`; style and info print as advice. A gate with a high false-positive
+ * rate does not make a repo careful, it teaches everyone the bypass flag — and the flag is shared
+ * with the gates that must never be bypassed.
+ */
+function shellcheckStep(): string {
+  return `
+# Shell correctness. Scripts are discovered by shebang over TRACKED files at push time, so a
+# script added later is covered without regenerating this hook.
+if command -v shellcheck >/dev/null 2>&1; then
+  scripts=$(git ls-files -z \\
+    | xargs -0 -I{} sh -c 'head -1 "{}" 2>/dev/null | grep -qE "^#!.*[/ ](ba|da|z)?sh( |$)" && echo "{}"' \\
+    | sort)
+  if [ -n "$scripts" ]; then
+    echo "› shellcheck ($(printf '%s\\n' "$scripts" | wc -l | tr -d ' ') scripts, blocking at severity=warning)"
+    printf '%s\\n' "$scripts" | xargs shellcheck -S warning || {
+      echo "  fix, or justify inline with '# shellcheck disable=SCxxxx  # why'"
+      exit 1
+    }
+  fi
+else
+  echo "› shellcheck skipped (not on PATH) — install it to gate this repo's shell scripts"
+fi`
+}
+
 export function generatePrePushHook(facts: ProjectFacts, gates?: GateConfig): string {
   const run = runPrefix(facts.packageManager)
   const c = facts.commands
@@ -227,9 +264,15 @@ export function generatePrePushHook(facts: ProjectFacts, gates?: GateConfig): st
         Boolean(key) && (allowed.has(key as string) || isSafeGateCommand(c.raw[key as string])),
     )
     .map((key) => `${run} ${key}`)
+  const shellStep = facts.shell?.scripts ? shellcheckStep() : ""
   const body = steps.length
     ? steps.map((s) => `echo "› ${s}"\n${s} || exit 1`).join("\n")
-    : 'echo "etymd: no correctness commands detected — add format:check / typecheck / lint"'
+    : shellStep
+      ? // A repo whose executable surface is shell HAS a correctness command — it just is not in
+        // package.json. Claiming "none detected" beside a step that is about to run would be the
+        // tool contradicting itself.
+        'echo "› no package scripts — shell is this repo\'s checkable surface"'
+      : 'echo "etymd: no correctness commands detected — add format:check / typecheck / lint"'
   // The truth gate on the repo's own instructions, at the tier this repo chose. Skipped with a
   // note rather than failing where etymd is not installed — a gate that cannot run must say so
   // instead of silently passing.
@@ -245,7 +288,7 @@ fi`
 # etymd: correctness gate. Mirrors CI cheapest-first; blocks the push on any failure.
 
 ${localHookCall("pre-push")}
-${body}
+${body}${shellStep}
 ${auditStep}
 
 # Content screen, second pass — the WHOLE TREE rather than one diff. Catches anything committed

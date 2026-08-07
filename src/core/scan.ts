@@ -9,6 +9,7 @@ import {
   detectFrameworks,
   detectHooks,
   detectPackageManager,
+  detectShellSurface,
   detectWorkspace,
   listWorkspacePackages,
   walkTree,
@@ -142,6 +143,9 @@ export async function scanProject(root: string, opts: ScanOptions = {}): Promise
 
   const hooksPath = hooksPathRaw ?? undefined
   const hooks = await detectHooks(abs, hooksPath, rootPkg)
+  // Needs `isRepo`, so it cannot join the first batch — the surface is defined as TRACKED files,
+  // which keeps build output and vendored scripts out of a repo's own correctness gate.
+  const shell = await detectShellSurface(abs, isRepo)
   const freshness = await collectFreshness(abs, isRepo, artifacts, opts.upstreamRemote)
   const packages = workspace.packageGlobs.length
     ? await listWorkspacePackages(abs, workspace.packageGlobs)
@@ -178,6 +182,7 @@ export async function scanProject(root: string, opts: ScanOptions = {}): Promise
     // vsce — which never runs prepublishOnly.
     publishRoute: !rootPkg ? "none" : rootPkg.engines?.vscode ? "vscode" : "npm",
     artifacts,
+    shell,
     freshness,
     tree,
   }

@@ -140,6 +140,21 @@ export interface ProjectFacts {
    */
   publishRoute: "npm" | "vscode" | "none"
   artifacts: DetectedArtifact[]
+  /**
+   * The repo's SHELL surface: tracked files that a shell executes.
+   *
+   * Package scripts are not the only executable surface a repo has, and in some repos they are
+   * not the main one — a tools or infra repo can be entirely `bootstrap/*.sh` plus `.githooks/*`
+   * with no `package.json` at all. Those are exactly the repos that report "no correctness
+   * commands detected", which reads as "nothing to check" when it means "nothing was looked at".
+   *
+   * Counted, not listed: the generated hook re-discovers scripts at push time by shebang, so it
+   * stays correct as the repo grows. This number only decides WHETHER the step is worth writing.
+   *
+   * Optional for the same reason as `freshness`: a facts file written by an older etymd predates
+   * the field, and absent must read as "not measured" rather than "measured as zero".
+   */
+  shell?: { scripts: number }
   /** Optional: baselines approved by older versions predate this fact. */
   freshness?: FreshnessFacts
   tree: {

@@ -4,7 +4,7 @@ import path from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { classifyCommands, detectHooks } from "../src/core/detect.js"
+import { classifyCommands, detectHooks, detectShellSurface } from "../src/core/detect.js"
 import { scanProject } from "../src/core/scan.js"
 
 let dir: string
@@ -192,5 +192,49 @@ describe("detectHooks", () => {
     const hooks = await detectHooks(dir, undefined, null)
     expect(hooks.source).toBe("githooks")
     expect(hooks.preCommit).toBe(true)
+  })
+})
+
+describe("detectShellSurface — the executable surface package.json cannot see", () => {
+  async function initRepo() {
+    const run = async (args: string[]) => {
+      const { execFile } = await import("node:child_process")
+      const { promisify } = await import("node:util")
+      await promisify(execFile)("git", args, { cwd: dir })
+    }
+    await run(["init"])
+    await run(["config", "user.email", "t@example.com"])
+    await run(["config", "user.name", "t"])
+    await run(["add", "-A"])
+    await run(["commit", "-m", "seed", "--no-verify"])
+  }
+
+  it("counts .sh files and extensionless shebang scripts, ignoring non-shell interpreters", async () => {
+    await write("bootstrap/install.sh", "#!/usr/bin/env bash\necho hi\n")
+    await write("bootstrap/legacy.sh", "#!/bin/sh\necho hi\n")
+    // Extensionless is the norm for hooks and bin entry points — the scripts most worth checking.
+    await write(".githooks/pre-push", "#!/usr/bin/env sh\nexit 0\n")
+    await write("bin/tool", "#!/bin/bash\nexit 0\n")
+    // Must NOT count: a different interpreter, and a file that merely mentions sh.
+    await write("bin/pytool", "#!/usr/bin/env python3\nprint(1)\n")
+    await write("bin/nodetool", "#!/usr/bin/env node\n")
+    await write("docs/notes.md", "#!/bin/sh is how you write a shebang\n")
+    await initRepo()
+
+    expect(await detectShellSurface(dir, true)).toEqual({ scripts: 4 })
+  })
+
+  it("counts only TRACKED files — an untracked or ignored script is not the repo's surface", async () => {
+    await write("tracked.sh", "#!/bin/sh\nexit 0\n")
+    await initRepo()
+    // Written after the commit, so git does not track it.
+    await write("untracked.sh", "#!/bin/sh\nexit 0\n")
+
+    expect(await detectShellSurface(dir, true)).toEqual({ scripts: 1 })
+  })
+
+  it("reports zero outside a git repository rather than walking the filesystem", async () => {
+    await write("orphan.sh", "#!/bin/sh\nexit 0\n")
+    expect(await detectShellSurface(dir, false)).toEqual({ scripts: 0 })
   })
 })

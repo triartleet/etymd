@@ -11,6 +11,7 @@ import type {
   WorkspaceKind,
 } from "./types.js"
 import {
+  git,
   isDirectory,
   matchesAnyGlob,
   normalizeRelPath,
@@ -485,6 +486,56 @@ const ARTIFACT_SPECS: Omit<DetectedArtifact, "exists">[] = [
     kind: "map",
   },
 ]
+
+/** Read enough of a file to see a shebang, without pulling a large file into memory. */
+async function firstLine(file: string): Promise<string> {
+  let handle
+  try {
+    handle = await fs.open(file, "r")
+    const { buffer, bytesRead } = await handle.read(Buffer.alloc(128), 0, 128, 0)
+    return buffer.subarray(0, bytesRead).toString("utf8").split("\n", 1)[0] ?? ""
+  } catch {
+    return ""
+  } finally {
+    await handle?.close()
+  }
+}
+
+/** `sh`, `bash`, `dash`, `zsh` — via a direct path or `env`. Not `python`, not `node`. */
+const SHELL_SHEBANG = /^#!\s*\/\S*\b(?:ba|da|z)?sh\b|^#!\s*\/usr\/bin\/env\s+(?:ba|da|z)?sh\b/
+
+/** Extensions we treat as shell without opening the file. */
+const SHELL_EXT = /\.(?:sh|bash|zsh)$/
+
+/**
+ * Count tracked files a shell executes.
+ *
+ * Extension is not enough on its own: git hooks, and most `bin/` entry points, are extensionless
+ * by convention, and those are the scripts most worth checking. So extensionless candidates are
+ * confirmed by shebang — bounded by SHEBANG_PROBE_CAP, since this runs on every scan and a large
+ * repo should not pay an unbounded open() sweep for a fact used to decide one hook step.
+ */
+export async function detectShellSurface(
+  root: string,
+  isRepo: boolean,
+): Promise<{ scripts: number }> {
+  if (!isRepo) return { scripts: 0 }
+  const listed = await git(root, ["ls-files", "-z"])
+  if (!listed) return { scripts: 0 }
+
+  const files = listed.split("\0").filter(Boolean)
+  const byExtension = files.filter((f) => SHELL_EXT.test(f))
+  // Extensionless files only — anything with a non-shell extension is not a shell script, and
+  // probing `.ts`/`.md` would waste the cap on files that can never qualify.
+  const candidates = files.filter((f) => !path.basename(f).includes("."))
+  const SHEBANG_PROBE_CAP = 400
+  const probed = await Promise.all(
+    candidates
+      .slice(0, SHEBANG_PROBE_CAP)
+      .map(async (f) => SHELL_SHEBANG.test(await firstLine(path.join(root, f)))),
+  )
+  return { scripts: byExtension.length + probed.filter(Boolean).length }
+}
 
 export async function detectArtifacts(root: string): Promise<DetectedArtifact[]> {
   const artifacts = await Promise.all(
