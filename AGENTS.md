@@ -33,6 +33,13 @@ Distilled from a frontrunner project workflow, validated against a sibling-repo 
 - **Pin every dependency to an exact version** (`.npmrc` has `save-exact=true`) — no `^`/`~`.
 - **One objective.** Every addition serves "keep your agent instructions true" or it does not
   ship — features off that axis were deliberately cut in 003; do not reintroduce them casually.
+- **Two tests before shipping any opinion.** Can the tool mechanize the check? _And_ would a user
+  who is not us ever set this? A field can pass the first and fail the second — that is how a
+  fleet's own policy ends up in a public package. A new **predicate** additionally answers the
+  five-question fitness test in
+  [005](docs/decisions/005-declared-rules.md#the-fitness-test-for-a-new-predicate), in writing, in
+  the PR that adds it; a "no" is a rejection. Four predicates is the design, and the count itself
+  is the alarm.
 - **Honesty is load-bearing.** Findings/claims the tool emits must cite evidence and disclose what
   they could not see (inherited CI templates, server-side thresholds, skipped heuristics). Never
   dress a heuristic as a fact — this is the product's core value and the repo's own rule.
