@@ -1,5 +1,33 @@
 # etymd
 
+## 0.3.1
+
+### Patch Changes
+
+- Regeneration keeps what a repo already had, and a fleet can declare a repo has no gates.
+
+  **Preservation moved into the generator.** `etymd gates` read the existing hook and kept a test
+  step it already ran; every other caller of `planWorkflow` did not — including the fleet gate-drift
+  check, which therefore compared each repo against a hook missing checks the repo really runs.
+  That reported permanent false drift, and anyone acting on it would have silently lost a check. A
+  guarantee that holds only on the path someone remembered to wire it into is not a guarantee.
+
+  **`gates: "none"` in a fleet manifest** declares that generated gates are deliberately absent — a
+  prose repo with nothing mechanically checkable, or one that gates itself by hand. Gate drift sits
+  among the wall checks, which are deliberately not ledger-quietable because a leak or a partition
+  breach has no honest resolution except a fix; that reasoning does not transfer to a settled
+  choice, and an un-silenceable finding for a decision already made is how a report teaches people
+  to stop reading it. The absence is disclosed rather than hidden, and an _undeclared_ absence still
+  reports — silence has to be earned by declaring it.
+
+  **A hand-written `.etymd/config.json` no longer crashes the generator.** Setting only
+  `gates.failOn` threw: the type declares `commands` as required, describing the shape etymd writes
+  rather than the shape a user writes.
+
+  **The publish gate points at the committed script.** `prepublishOnly` resolving a bare
+  `artifact-check` from `PATH` meant the door guarding what actually ships was silently absent for
+  every clone but one.
+
 ## 0.3.0
 
 ### Minor Changes
