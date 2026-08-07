@@ -1,5 +1,45 @@
 # etymd
 
+## 0.5.0
+
+### Minor Changes
+
+- e199ccc: `fleet add --profile corp` now records the alias-to-directory mapping too, not just the entry.
+
+  A corp entry in the tracked manifest is deliberately alias-only — no path, no remote — which is
+  what keeps employer names out of a file that gets pushed. It also means the entry resolves to
+  nothing on its own. Registering wrote only that half, so every corp registration ended as a
+  dangling entry that `fleet check` reported immediately and the user had to fix by hand, in the
+  one file the tool otherwise never asks anyone to hand-edit.
+
+  The mapping is written `~`-relative, so the local manifest stays portable between machines, and
+  merged into the existing document so hand-maintained entries survive.
+
+  Two refusals guard it, because this file is the one place real employer directory names are
+  written down. If the local manifest is not gitignored, registration refuses rather than creating
+  a file git would track — a leak the tool creates is worse than a registration it declines to
+  finish. If the file exists but is not valid JSON, it refuses rather than overwriting mappings
+  that cannot be re-derived.
+
+  The mapping is written before the tracked entry. The failure modes are not symmetric: a mapping
+  without an entry is inert, while an entry without a mapping is a broken registration sitting in
+  the file that gets committed.
+
+- 9546979: `fleet add` no longer records a remote URL in the manifest.
+
+  The field was write-only: nothing in the tool ever read it back. It was persisted because it
+  happened to be derivable at registration time, and it stayed because no one asked what consumed
+  it.
+
+  It is also the field that turned a mis-profiled entry into a real disclosure. A raw remote URL
+  carries the host and the internal group path; `path` carries a bare directory name. Removing a
+  field no consumer reads retires that class outright, with no host-matching heuristic, and unlike
+  the corp-host guard it keeps working on a machine that has no local manifest to read corp hosts
+  from. The remote stays derivable from the checkout at any time, which is where it came from.
+
+  Existing entries that already carry a remote are left alone — nothing reads them, and rewriting
+  a hand-maintained manifest to remove inert keys would be a worse trade than leaving them.
+
 ## 0.4.2
 
 ### Patch Changes
