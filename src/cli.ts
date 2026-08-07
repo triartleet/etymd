@@ -210,6 +210,9 @@ interface FleetSharedOpts {
   manifest?: string
   json?: boolean
   reason?: string
+  /** Declared on `fleet` as the sweep filter, but commander routes a subcommand's own
+   *  `--profile` here too — so `add` must read it from the merged view to see the flag at all. */
+  profile?: string
 }
 
 fleet
@@ -248,7 +251,12 @@ fleet
         target: dir,
         name: opts.name,
         kind: opts.kind,
-        profile: opts.profile,
+        // `fleet` declares its own --profile (the sweep filter), and commander hands a
+        // parent-declared option the value even when it is typed AFTER the subcommand — so
+        // `fleet add <dir> --profile corp` left opts.profile undefined and the flag silently
+        // did nothing, registering employer repos as personal. Reading the merged view is what
+        // makes the flag work; the corp-remote guard in add() is what makes forgetting it safe.
+        profile: opts.profile ?? shared.profile,
         trust: opts.trust,
         yes: opts.yes,
       })

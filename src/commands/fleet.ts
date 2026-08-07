@@ -442,6 +442,23 @@ export async function add(opts: FleetAddCmdOptions): Promise<void> {
     throw new Error("corp entries take no `trust` — `profile: corp` already implies it")
   }
 
+  // The manifest already declares which hosts are the employer's, and the remote was just read
+  // — so a corp repo landing as a personal entry is a failure the tool has every fact needed to
+  // prevent. It matters because the two branches differ exactly where it is dangerous: the
+  // personal one records `path` and the RAW `remote`, so a mis-profiled corp repo writes the
+  // employer host and its internal group structure into a manifest that is tracked and pushed.
+  // That is the leak the alias convention exists to prevent, and it sat one forgotten flag away.
+  // Refuse rather than auto-correct: placement is the user's call, but it may not be made by
+  // omission.
+  const corpHost = remote ? manifest.corpHosts.find((h) => remote.includes(h)) : undefined
+  if (corpHost && profile !== "corp") {
+    throw new Error(
+      `\`${name}\` has a remote on the corp host \`${corpHost}\`, but --profile is \`${profile}\`. ` +
+        `A personal entry records its path and raw remote in the TRACKED manifest — register it ` +
+        `with \`--profile corp\` (alias-only, machine-pinned), or move it out of the fleet root.`,
+    )
+  }
+
   const entry: Record<string, unknown> =
     profile === "corp"
       ? { name, kind, profile, private: true }
