@@ -262,6 +262,11 @@ them. Each one calls a companion instead — `.githooks/pre-commit.local`, `comm
 `pre-push.local` — that etymd **never reads, writes, or regenerates**. Make it executable and it
 runs; a non-zero exit stops the commit or push exactly as the generated checks do.
 
+> **Commit the companion, and check your `.gitignore` first.** A `*.local` rule — common for env
+> files, and shipped by some framework templates — silently swallows these too. The guard then
+> works on the machine that wrote it and is absent for everyone who clones, which looks identical
+> to having no guard at all. Add `!.githooks/*.local` if that rule exists.
+
 ```sh
 cat > .githooks/pre-commit.local <<'EOF'
 #!/usr/bin/env sh
