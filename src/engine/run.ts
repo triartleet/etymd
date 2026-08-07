@@ -98,10 +98,11 @@ export async function runAudit(root: string, opts: AuditOptions = {}): Promise<A
   }
   const profile = baseline?.profile ?? deriveProfile(facts)
 
-  const selected = LENSES.filter(
-    (lens) =>
-      (!opts.kind || lens.kind === opts.kind) && (!opts.lensIds || opts.lensIds.includes(lens.id)),
-  )
+  // Select lenses by --lensIds only. Kind filtering moved to the FINDING level: a lens can emit
+  // both truth and improvement findings (gate-integrity is improvement, but "hooks-not-wired" is
+  // an objective truth a `doctor` run must see). Filtering at the lens level silently skipped
+  // findings that did not share the lens's label — which is how `doctor` missed a security risk.
+  const selected = LENSES.filter((lens) => !opts.lensIds || opts.lensIds.includes(lens.id))
 
   const reports: LensReport[] = []
   for (const lens of selected) {
@@ -121,14 +122,17 @@ export async function runAudit(root: string, opts: AuditOptions = {}): Promise<A
     }
   }
 
-  const all = reports.flatMap((r) => r.findings)
+  // Stamp each finding with its kind: the finding's own if set, else the lens's. Then filter by
+  // --kind at the finding level so a truth-only `doctor` sees truth findings from every lens.
+  const all = reports.flatMap((r) => r.findings.map((f) => ({ ...f, kind: f.kind ?? r.kind })))
+  const visible = opts.kind ? all.filter((f) => f.kind === opts.kind) : all
   const previous = await readLedger(ledgerRoot)
   // Files no lens looked at this run must not have their tracked findings closed as fixed.
   const outOfScope = reports.flatMap((r) => r.outOfScope ?? [])
   const { ledger, diff } = reconcileLedger(previous, all, undefined, outOfScope)
-  // A partial run (kind/lens filter) must not mark unexamined findings resolved — only persist
-  // the reconciliation when every lens ran.
-  const fullRun = selected.length === LENSES.length
+  // A partial run (kind or lens filter) must not mark unexamined findings resolved — only persist
+  // the reconciliation when every lens ran AND no kind filter excluded any findings.
+  const fullRun = !opts.kind && !opts.lensIds
   // A read-only root only ever takes ledger writes when they are redirected elsewhere.
   const ledgerWritable = !opts.readOnlyRoot || ledgerRoot !== root
   if ((opts.persistLedger ?? true) && fullRun && ledgerWritable) {
@@ -141,7 +145,7 @@ export async function runAudit(root: string, opts: AuditOptions = {}): Promise<A
     baseline,
     config,
     reports,
-    findings: rankFindings(visibleFindings(all, previous)),
+    findings: rankFindings(visibleFindings(visible, previous)),
     ledger,
     diff,
   }

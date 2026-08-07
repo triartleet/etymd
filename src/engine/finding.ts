@@ -10,6 +10,13 @@ export interface Finding {
   id: string
   lens: string
   tier: FindingTier
+  /**
+   * Whether this finding is an objective truth (the repo is lying) or an improvement opinion
+   * (something worth doing). Lives ON THE FINDING, not the lens: a lens can emit both kinds —
+   * gate-integrity is an improvement lens, but "hooks-not-wired" is an objective truth a `doctor`
+   * run must not skip. Defaulted from the lens kind when a finding does not set its own.
+   */
+  kind?: LensKind
   /** One sentence: what is wrong / missing. */
   claim: string
   /** File paths, job names, or metrics that ground the claim. Never empty. */

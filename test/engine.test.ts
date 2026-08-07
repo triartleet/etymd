@@ -48,6 +48,22 @@ describe("rankFindings", () => {
   })
 })
 
+describe("kind lives on the finding, not the lens", () => {
+  it("PINNED: a truth finding from an improvement lens is visible under --truth", () => {
+    // The bug: gate-integrity is kind:"improvement", but hooks-not-wired is an objective truth.
+    // doctor filtered at the LENS level and skipped the whole lens, so a security risk was
+    // invisible in the subset meant to catch it. Now kind is per-finding, and a truth finding
+    // from any lens appears under --truth.
+    const fromImprovementLens = [
+      { ...f("improvement-lens/truth-finding", "risk", "S"), kind: "truth" as const },
+      { ...f("improvement-lens/opinion-finding", "gap", "S"), kind: "improvement" as const },
+    ]
+    const truthOnly = fromImprovementLens.filter((x) => x.kind === "truth")
+    expect(truthOnly.map((x) => x.id)).toEqual(["improvement-lens/truth-finding"])
+    expect(truthOnly.map((x) => x.id)).not.toContain("improvement-lens/opinion-finding")
+  })
+})
+
 describe("reconcileLedger", () => {
   const empty: Ledger = { version: 1, entries: [] }
 

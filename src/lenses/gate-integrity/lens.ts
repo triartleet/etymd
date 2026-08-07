@@ -52,6 +52,7 @@ export function deriveGateFindings(inv: GateInventory, disclosures: string[] = [
         finding({
           id: `${LENS_ID}/hooks-not-wired`,
           tier: "risk",
+          kind: "truth",
           claim: "Tracked .githooks/ exist but git core.hooksPath is unset — the hooks never run",
           evidence: [".githooks/"],
           why: "Every check in those hooks is silently skipped on this clone.",
