@@ -24,3 +24,14 @@ jobs:
       # exact command; a truth guard that does not run on itself is the thing it exists to catch.
       - name: etymd audit (self)
         run: node dist/cli.js audit --no-ledger --fail-on risk
+      # The publish artifact, proven on every push rather than first attempted on release day.
+      # The class this guards is real: packagers ignore .gitignore, so a stray local file can
+      # ship in a release while every git-scoped check stays green. Asserting the exact top-level
+      # manifest of the tarball catches any addition — file or directory — before it is permanent.
+      - name: pack dry-run (what would ship)
+        run: |
+          npm pack --pack-destination /tmp >/dev/null
+          tar -tzf /tmp/etymd-*.tgz | sed 's|^package/||' | cut -d/ -f1 | sort -u > /tmp/shipped
+          printf 'CHANGELOG.md\nLICENSE\nREADME.md\ndist\npackage.json\n' > /tmp/expected
+          diff /tmp/expected /tmp/shipped || {
+            echo "::error::tarball contents differ from the expected manifest above"; exit 1; }

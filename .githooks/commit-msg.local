@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+# Semantic disclosure review of the commit message, beside the pattern screen. The screen
+# matches literal patterns, so it catches names; it cannot catch a leaky DESCRIPTION — that
+# needs a reviewer reading the text. Resolved from PATH, no-op when absent: this file carries
+# no policy and is safe on any clone.
+GATE=$(command -v disclosure-gate || true)
+[ -x "$GATE" ] && exec "$GATE" --message "$1"
+exit 0

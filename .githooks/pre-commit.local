@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Semantic disclosure review of the staged diff — the companion of commit-msg.local; see there.
+GATE=$(command -v disclosure-gate || true)
+[ -x "$GATE" ] && exec "$GATE" --staged
+exit 0
