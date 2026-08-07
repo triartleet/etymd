@@ -6,10 +6,30 @@ import {
   generateCommitMsgHook,
   generatePreCommitHook,
   generatePrePushHook,
+  isSafeGateCommand,
 } from "../pack/templates.js"
-import type { GateConfig } from "./config.js"
+import { DEFAULT_CONFIG, type GateConfig } from "./config.js"
 import type { ProjectFacts } from "./types.js"
 import { pathExists, readText } from "./util.js"
+
+/**
+ * The scan's opening guess at what a pre-push gate should run.
+ *
+ * `test` is included only when the existing hook already ran it. It stays out of the default set
+ * — a slow suite in a push gate is how people learn to reach for `--no-verify` — but REMOVING a
+ * check a repo already had is a silent downgrade, and a generator that quietly drops working
+ * checks cannot be trusted to regenerate anything.
+ */
+export function derivedCommands(facts: ProjectFacts, existingHook?: string): string[] {
+  const c = facts.commands
+  const base = [c.formatCheck, c.typecheck, c.lint].filter(
+    (k): k is string => Boolean(k) && isSafeGateCommand(c.raw[k as string]),
+  )
+  if (c.test && existingHook && new RegExp(`\\b${c.test}\\b`).test(existingHook)) {
+    base.push(c.test)
+  }
+  return base
+}
 
 export interface GeneratedFile {
   path: string
@@ -62,6 +82,12 @@ export async function planWorkflow(
     await add("AGENTS.md", generateAgentsMd(facts), "Minimal operating contract (scaffold)")
   }
   if (opts.gates) {
+    // Preservation belongs HERE, not in the command that calls this. `etymd gates` used to read
+    // the existing hook itself, so every other caller — the fleet drift check above all —
+    // regenerated without it and compared a repo against a hook missing checks the repo really
+    // runs: permanent false drift, and a silent downgrade for anyone who applied it.
+    const existingPrePush = await readText(path.join(root, ".githooks", "pre-push"))
+
     await add(".githooks/pre-commit", generatePreCommitHook(), "Process gate (pre-commit)", true)
     await add(
       ".githooks/commit-msg",
@@ -69,9 +95,20 @@ export async function planWorkflow(
       "Content screen (commit message)",
       true,
     )
+    // A recorded command set is the user's decision and wins outright; otherwise derive, keeping
+    // whatever the existing hook already ran.
+    const gateConfig: GateConfig | undefined = opts.gateConfig?.commands.length
+      ? opts.gateConfig
+      : {
+          commands: derivedCommands(facts, existingPrePush ?? undefined),
+          failOn: opts.gateConfig?.failOn ?? DEFAULT_CONFIG.gates.failOn,
+          publishGate: opts.gateConfig?.publishGate,
+          allowWriting: opts.gateConfig?.allowWriting ?? [],
+        }
+
     await add(
       ".githooks/pre-push",
-      generatePrePushHook(facts, opts.gateConfig),
+      generatePrePushHook(facts, gateConfig),
       "Correctness gate (pre-push)",
       true,
     )

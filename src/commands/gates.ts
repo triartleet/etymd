@@ -5,7 +5,7 @@ import { cancel, confirm, isCancel, multiselect, select } from "@clack/prompts"
 
 import { applyFiles } from "../core/apply.js"
 import { CONFIG_FILE, configPath, readConfig, type GateConfig } from "../core/config.js"
-import { planWorkflow } from "../core/generate.js"
+import { derivedCommands, planWorkflow } from "../core/generate.js"
 import { ensurePackageScript } from "../core/merge-json.js"
 import { scanProject } from "../core/scan.js"
 import type { ProjectFacts } from "../core/types.js"
@@ -32,25 +32,6 @@ export interface GatesOptions {
   cwd: string
   ci?: boolean
   yes?: boolean
-}
-
-/**
- * The scan's opening guess at what a pre-push gate should run.
- *
- * `test` is included when a repo already runs it in a hook. It is deliberately not part of the
- * default set — a slow suite in a push gate is how people learn to reach for --no-verify — but
- * REMOVING a check the repo already had is a silent downgrade, and a generator that quietly
- * drops working checks cannot be trusted to regenerate anything.
- */
-export function derivedCommands(facts: ProjectFacts, existingHook?: string): string[] {
-  const c = facts.commands
-  const base = [c.formatCheck, c.typecheck, c.lint].filter(
-    (k): k is string => Boolean(k) && isSafeGateCommand(c.raw[k as string]),
-  )
-  if (c.test && existingHook && new RegExp(`\\b${c.test}\\b`).test(existingHook)) {
-    base.push(c.test)
-  }
-  return base
 }
 
 /** Show the derivations in one place, so "accept" is an informed keystroke rather than a guess. */

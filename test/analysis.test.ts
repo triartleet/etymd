@@ -1,7 +1,11 @@
+import { promises as fs } from "node:fs"
+import os from "node:os"
+import path from "node:path"
+
 import { describe, expect, it } from "vitest"
 
-import { derivedCommands, mergeGateSection } from "../src/commands/gates.js"
-import { planWorkflow } from "../src/core/generate.js"
+import { mergeGateSection } from "../src/commands/gates.js"
+import { derivedCommands, planWorkflow } from "../src/core/generate.js"
 import { isDriftEmpty, summarizeBaselineDrift } from "../src/core/facts.js"
 import type { ProjectFacts } from "../src/core/types.js"
 import {
@@ -318,5 +322,26 @@ describe("gate config _why annotations", () => {
   it("preserves unknown keys etymd does not define", () => {
     const merged = mergeGateSection({ _note: "hand-written", failOn: "risk" }, gates)
     expect(merged._note).toBe("hand-written")
+  })
+})
+
+describe("preservation is a property of generation, not of the command", () => {
+  it("PINNED: planWorkflow itself keeps a test step the existing hook ran", async () => {
+    // It used to live in `etymd gates`, so every OTHER caller regenerated without it — the fleet
+    // drift check compared a repo against a hook missing checks the repo really runs, reporting
+    // permanent false drift and offering a silent downgrade to anyone who applied it.
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "etymd-preserve-"))
+    await fs.mkdir(path.join(dir, ".githooks"), { recursive: true })
+    await fs.writeFile(path.join(dir, ".githooks", "pre-push"), "#!/bin/sh\nnpm test || exit 1\n")
+
+    const plan = await planWorkflow(dir, facts(), { agents: false, gates: true })
+    const prePush = plan.find((p) => p.path === ".githooks/pre-push")?.contents ?? ""
+    expect(prePush).toContain("test")
+
+    // A repo whose hook never ran tests does not silently gain a slow step.
+    const fresh = await fs.mkdtemp(path.join(os.tmpdir(), "etymd-preserve-"))
+    const freshPlan = await planWorkflow(fresh, facts(), { agents: false, gates: true })
+    const freshHook = freshPlan.find((p) => p.path === ".githooks/pre-push")?.contents ?? ""
+    expect(freshHook).not.toMatch(/^pnpm test/m)
   })
 })
