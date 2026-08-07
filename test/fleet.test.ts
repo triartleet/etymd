@@ -1044,3 +1044,77 @@ describe("fleet add — the corp perimeter", () => {
     expect(doc.projects[0].remote).toContain("github.com")
   })
 })
+
+describe("fleet add — corp registration writes both halves", () => {
+  const CORP2 = "gitlab.corp.example.invalid"
+
+  async function repoWithRemote(rel: string, url: string) {
+    await initRepo(rel)
+    await gitIn(path.join(dir, rel), null, ["remote", "add", "origin", url])
+    return path.join(dir, rel)
+  }
+
+  it("writes the alias to directory mapping into the local manifest, not just the entry", async () => {
+    // A corp entry is alias-only by design, so it resolves to nothing without this mapping —
+    // registering used to leave a dangling entry that `fleet check` reported immediately.
+    const target = await repoWithRemote("svc3", `git@${CORP2}:group/sub/svc3.git`)
+    const manifestPath = await writeHub([], {
+      local: { machineProfile: "corp", dirs: { existing: "~/keep/me" }, corpHosts: [CORP2] },
+    })
+    await add({
+      cwd: path.dirname(manifestPath),
+      target,
+      name: "c-new",
+      profile: "corp",
+      yes: true,
+    })
+
+    const local = JSON.parse(
+      await fs.readFile(path.join(path.dirname(manifestPath), "registry.local.json"), "utf8"),
+    )
+    expect(local.dirs["c-new"]).toBe(target)
+    // Mappings that were already there survive — this file is hand-maintained and machine-local,
+    // so anything lost here cannot be re-derived.
+    expect(local.dirs.existing).toBe("~/keep/me")
+    expect(local.machineProfile).toBe("corp")
+  })
+
+  it("PINNED: refuses when the local manifest is not gitignored", async () => {
+    // This file is the one place real employer directory names get written down. Creating it
+    // where git would track it produces exactly the disclosure the alias convention prevents.
+    const target = await repoWithRemote("svc4", `git@${CORP2}:group/sub/svc4.git`)
+    const manifestPath = await writeHub([], {
+      local: { machineProfile: "corp", dirs: {}, corpHosts: [CORP2] },
+    })
+    const hub = path.dirname(manifestPath)
+    await gitIn(dir, null, ["init", "-q", hub])
+    await fs.writeFile(path.join(hub, ".gitignore"), "# deliberately does NOT ignore it\n", "utf8")
+
+    await expect(
+      add({ cwd: hub, target, name: "c-leaky", profile: "corp", yes: true }),
+    ).rejects.toThrow(/not gitignored/i)
+
+    // And the tracked half must not have been written either — the mapping goes first precisely
+    // so a refusal leaves no dangling entry behind.
+    const doc = JSON.parse(await fs.readFile(manifestPath, "utf8"))
+    expect(doc.projects).toHaveLength(0)
+  })
+
+  it("leaves the local manifest untouched for a personal entry", async () => {
+    const target = await repoWithRemote("mine2", "git@github.com:me/thing2.git")
+    const manifestPath = await writeHub([], {
+      local: { machineProfile: "corp", dirs: {}, corpHosts: [CORP2] },
+    })
+    await add({
+      cwd: path.dirname(manifestPath),
+      target,
+      name: "thing2",
+      trust: "private",
+      yes: true,
+    })
+    const local = JSON.parse(
+      await fs.readFile(path.join(path.dirname(manifestPath), "registry.local.json"), "utf8"),
+    )
+    expect(local.dirs).toEqual({})
+  })
+})

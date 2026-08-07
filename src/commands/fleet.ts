@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs"
+import os from "node:os"
 import path from "node:path"
 
 import { cancel, confirm, isCancel, select, text } from "@clack/prompts"
@@ -324,6 +325,66 @@ export interface FleetAddCmdOptions {
  * set true by construction instead of true by remembering. Non-interactive runs (`--yes`, CI)
  * must pass every mandatory value as a flag; a missing one is an error, never a default.
  */
+/**
+ * Record a corp entry's alias → directory mapping in the gitignored local manifest.
+ *
+ * A corp entry in the tracked manifest is deliberately alias-only: no path, no remote. That is
+ * what keeps employer names out of a file that gets pushed — and it also means the entry cannot
+ * resolve to anything on its own. Writing the tracked half alone leaves a registration that
+ * `fleet check` immediately reports as dangling, so the command that claims to register a
+ * project finishes the job it starts.
+ *
+ * The path is written `~`-relative: the tracked manifest never records a machine home, and the
+ * local one should not either — it is copied between machines by hand.
+ *
+ * The gitignore check is not defensive padding. This file is the one place real employer
+ * directory names are written down, so creating it somewhere git would track it would produce
+ * exactly the disclosure the alias convention exists to prevent. Refusing is the only safe
+ * answer: a leak that the tool creates is worse than a registration it declines to finish.
+ */
+async function recordCorpMapping(
+  manifest: { localPath: string; dir: string },
+  name: string,
+  absTarget: string,
+): Promise<string> {
+  const home = os.homedir()
+  const value =
+    absTarget === home || absTarget.startsWith(home + path.sep)
+      ? `~${absTarget.slice(home.length)}`
+      : absTarget
+
+  const insideRepo = (await git(manifest.dir, ["rev-parse", "--is-inside-work-tree"])) === "true"
+  if (insideRepo) {
+    const ignored = (await git(manifest.dir, ["check-ignore", "-q", manifest.localPath])) !== null
+    if (!ignored) {
+      throw new Error(
+        `${path.basename(manifest.localPath)} is not gitignored — refusing to write employer ` +
+          `directory names into a file git would track. Add it to .gitignore, then re-run.`,
+      )
+    }
+  }
+
+  const existing = await readText(manifest.localPath)
+  let doc: Record<string, unknown> = {}
+  if (existing) {
+    try {
+      doc = JSON.parse(existing) as Record<string, unknown>
+    } catch {
+      // Hand-maintained and machine-local: rewriting over a syntax error would destroy the
+      // only copy of every other mapping on this machine.
+      throw new Error(
+        `${path.basename(manifest.localPath)} is not valid JSON — fix it before registering, ` +
+          `so the mapping is not written over hand-maintained entries that cannot be re-derived.`,
+      )
+    }
+  }
+  const dirs = (doc.dirs as Record<string, unknown> | undefined) ?? {}
+  dirs[name] = value
+  doc.dirs = dirs
+  await fs.writeFile(manifest.localPath, JSON.stringify(doc, null, 2) + "\n", "utf8")
+  return value
+}
+
 export async function add(opts: FleetAddCmdOptions): Promise<void> {
   const { manifest, autoNote } = await loadManifest(opts.cwd, opts.manifest)
   if (autoNote) print(`  ${theme.dim(`◦ ${autoNote}`)}`)
@@ -493,6 +554,15 @@ export async function add(opts: FleetAddCmdOptions): Promise<void> {
     }
   }
 
+  // The local mapping goes FIRST for a corp entry, because the two failure modes are not
+  // symmetric. A mapping written without its entry is inert — a `dirs` key nothing reads. An
+  // entry written without its mapping is a registration that resolves to nothing, in the file
+  // that gets committed and pushed. Write the recoverable half first.
+  let mappedTo: string | undefined
+  if (profile === "corp") {
+    mappedTo = await recordCorpMapping(manifest, name, absTarget)
+  }
+
   // Append into the existing `projects` array by re-serializing the parsed document: the
   // manifest is hand-maintained and carries `_readme`/`_note` prose that a naive rewrite would
   // drop, so key order is preserved by mutating the parsed object rather than rebuilding it.
@@ -502,6 +572,11 @@ export async function add(opts: FleetAddCmdOptions): Promise<void> {
   await fs.writeFile(manifest.manifestPath, JSON.stringify(doc, null, 2) + "\n", "utf8")
 
   print(`  ${glyph.ok} ${theme.dim("registered")} ${theme.info(name)}`)
+  if (mappedTo) {
+    print(
+      `  ${glyph.ok} ${theme.dim("mapped")} ${theme.info(`${name} → ${mappedTo}`)} ${theme.dim(`in ${path.basename(manifest.localPath)} (gitignored)`)}`,
+    )
+  }
   print(`  ${theme.dim(`verify with \`etymd fleet check --manifest ${manifest.manifestPath}\``)}`)
 }
 
