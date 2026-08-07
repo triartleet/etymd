@@ -1,5 +1,45 @@
 # etymd
 
+## 0.3.0
+
+### Minor Changes
+
+- Content screening, a registration gate, and gates that can be regenerated without loss.
+
+  **`etymd screen` — a content screen with no opinions of its own.** Four scopes for the four ways
+  content leaves a repository: `--staged` (a commit), `--message` (the message, which the staged
+  scan cannot see), `--tree` (everything tracked), and `--dir` (an unpacked build artifact). The
+  last exists because the others share a blind spot — they answer "what is in the repository?",
+  while `npm` and `vsce` ignore `.gitignore`, so a local file can ship to users while every
+  git-scoped check passes forever.
+
+  It ships **no patterns and never will**: the strings worth screening for are themselves the
+  sensitive material. You supply a pattern file; without one the command is inert and says so,
+  rather than reporting clean for a check it did not run. A repository naming itself is exempt, and
+  a repo-level allow file covers lines that cannot carry an inline marker — a scanner's own source
+  necessarily contains the patterns it screens for.
+
+  **`etymd gates` generates all four doors**, including a `commit-msg` hook and a publish-time
+  screen wired to the key the project's publish route actually runs (`vsce` ignores
+  `prepublishOnly`). Generated hooks resolve the screener at run time and no-op when it is absent,
+  so the same file is safe to commit to a public repository.
+
+  **Your own checks live beside the generated ones.** Each hook calls `.githooks/<hook>.local` if it
+  exists — a file etymd never reads, writes, or regenerates. Regeneration no longer forces a choice
+  between accepting the pack and keeping your own guards, and it will not drop a test step an
+  existing hook already ran.
+
+  **Setup is one keystroke.** `gates` shows a plan with every derivation stated and asks once;
+  `customize` reaches each choice. Answers record to `.etymd/config.json`, where
+  `gates._why.<field>` can carry the reason a value is what it is — dropped automatically when the
+  value it explains changes, because a stale reason misleads exactly where it meant to inform.
+
+  **`etymd fleet add`** registers a project, prompting for what no scan can derive and refusing to
+  write an incomplete entry. Fleet manifests gain a mandatory `trust` level on non-corp entries —
+  absence is a finding, never a silent default — a manifest-level `orientation.root` replacing
+  per-entry links, and a gate-drift check that reports a repository missing a gate its siblings
+  install.
+
 ## 0.2.2
 
 ### Patch Changes
