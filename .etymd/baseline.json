@@ -1,21 +1,21 @@
 {
-  "packVersion": "2",
-  "etymdVersion": "0.0.1",
-  "approvedAt": "2026-07-28T05:19:58.837Z",
+  "packVersion": "3",
+  "etymdVersion": "0.3.1",
+  "approvedAt": "2026-08-07T11:58:05.489Z",
   "profile": "solo",
   "facts": {
-    "etymdVersion": "0.0.1",
-    "packVersion": "2",
-    "generatedAt": "2026-07-28T05:19:58.834Z",
+    "etymdVersion": "0.3.1",
+    "packVersion": "3",
+    "generatedAt": "2026-08-07T11:58:05.487Z",
     "root": ".",
     "name": "etymd",
     "git": {
       "isRepo": true,
       "branch": "main",
-      "head": "064efbd",
+      "head": "4abf3e9",
       "hooksPath": ".githooks",
       "husky": false,
-      "recentAuthors": 2
+      "recentAuthors": 1
     },
     "packageManager": "npm",
     "node": ">=18.17",
@@ -37,7 +37,7 @@
         "format:check": "prettier --check . && npm run guard:md",
         "guard:md": "! grep -rnF --include=*.md --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git '\\*\\*' .",
         "prepare": "npm run build",
-        "prepublishOnly": "npm run build",
+        "prepublishOnly": "npm run build && ./scripts/artifact-check.sh",
         "changeset": "changeset",
         "version:packages": "changeset version",
         "release": "npm run build && changeset publish"
@@ -60,9 +60,11 @@
       "dir": ".githooks",
       "preCommit": true,
       "prePush": true,
-      "commitMsg": false,
+      "commitMsg": true,
       "lintStaged": false
     },
+    "publishable": true,
+    "publishRoute": "npm",
     "artifacts": [
       {
         "id": "agents",
@@ -77,6 +79,27 @@
         "path": "PROJECT_CONTEXT.md",
         "kind": "state",
         "exists": false
+      },
+      {
+        "id": "decisions",
+        "label": "DECISIONS.md (decision record)",
+        "path": "DECISIONS.md",
+        "kind": "decisions",
+        "exists": false
+      },
+      {
+        "id": "adr-dir",
+        "label": "ADR directory (docs/adr)",
+        "path": "docs/adr",
+        "kind": "decisions",
+        "exists": false
+      },
+      {
+        "id": "decisions-dir",
+        "label": "ADR directory (docs/decisions)",
+        "path": "docs/decisions",
+        "kind": "decisions",
+        "exists": true
       },
       {
         "id": "claude",
@@ -168,32 +191,63 @@
         "path": "docs/INVENTORY.md",
         "kind": "map",
         "exists": false
+      },
+      {
+        "id": "adr-files",
+        "label": "ADR files (docs/NNNN-*.md)",
+        "path": "docs",
+        "kind": "decisions",
+        "exists": false
       }
     ],
+    "freshness": {
+      "repoLastCommit": "2026-08-07T13:57:22+02:00",
+      "artifacts": [
+        {
+          "artifactId": "decisions-dir",
+          "path": "docs/decisions",
+          "lastCommit": "2026-08-07T08:48:31+02:00",
+          "commitsSince": true
+        }
+      ],
+      "unverifiable": []
+    },
     "tree": {
       "dirs": [
         {
           "name": "src",
-          "files": 34
+          "files": 40
         },
         {
           "name": "test",
-          "files": 7
+          "files": 11
         },
         {
           "name": "docs",
-          "files": 4
+          "files": 6
+        },
+        {
+          "name": ".githooks",
+          "files": 3
         },
         {
           "name": ".changeset",
           "files": 2
         },
         {
-          "name": ".githooks",
+          "name": "media",
           "files": 2
         },
         {
           "name": ".github",
+          "files": 1
+        },
+        {
+          "name": ".vscode",
+          "files": 1
+        },
+        {
+          "name": "scripts",
           "files": 1
         }
       ],
