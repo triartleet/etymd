@@ -110,9 +110,14 @@ describe("expandScriptRefs / matchTools", () => {
 // in an org template) but SONAR_* variables + allow_failure; husky-v3 + lint-staged
 // prettier-only locally; coverage collected but no threshold; commitlint installed but unwired;
 // an org include the tool cannot read; !reference tags that must not break parsing.
+//
+// Every identifier below is INVENTED, and must stay that way. A fixture modelled on a real
+// repository is exactly where a real name slips into a public one: the shape is all the test
+// needs, while the name is what a reader can match against something real. Describe the shape,
+// never borrow the name.
 const LEGACY_SPA_CI = `
 include:
-  - project: "org/pipeline-templates"
+  - project: "example-org/ci-includes"
     file: "/frontend.yml"
 
 stages:
@@ -169,7 +174,7 @@ describe("buildGateInventory (cra-legacy-shaped fixture)", () => {
     const inv = await buildGateInventory(dir, facts)
 
     expect(inv.ci.parseErrors).toEqual([])
-    expect(inv.ci.inheritedIncludes.some((i) => i.includes("org/pipeline-templates"))).toBe(true)
+    expect(inv.ci.inheritedIncludes.some((i) => i.includes("example-org/ci-includes"))).toBe(true)
 
     // The sonar job's script is inherited — detected from its name/SONAR_* variables, honestly
     // marked as not-locally-visible.
