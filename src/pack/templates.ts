@@ -22,15 +22,21 @@ import { PACK_VERSION } from "./version.js"
  * stamp is pack-owned output, regenerated with the file and never a place to write anything.
  * The repo's own text still lives in the `.local` companion, which etymd does not read or write.
  */
-const GENERATION_MARKER_RE = /^# etymd:generated pack-v\S+ ([0-9a-f]{16})$/
+const GENERATION_MARKER_RE = /^(?:# |<!-- )etymd:generated pack-v\S+ ([0-9a-f]{16})(?: -->)?$/
 
 function digestOf(body: string): string {
   return createHash("sha256").update(body).digest("hex").slice(0, 16)
 }
 
-/** Append the stamp. Deterministic: the same body always yields the same bytes. */
-export function stampGenerated(body: string): string {
-  return `${body}# etymd:generated pack-v${PACK_VERSION} ${digestOf(body)}\n`
+/**
+ * Append the stamp. Deterministic: the same body always yields the same bytes.
+ *
+ * The comment syntax is the file's, not ours — a stamp that renders as text in the artifact it
+ * describes is a defect in the artifact. Shell scripts take `#`, markdown takes an HTML comment.
+ */
+export function stampGenerated(body: string, comment: "sh" | "md" = "sh"): string {
+  const marker = `etymd:generated pack-v${PACK_VERSION} ${digestOf(body)}`
+  return `${body}${comment === "md" ? `<!-- ${marker} -->` : `# ${marker}`}\n`
 }
 
 export type FileOrigin =
@@ -119,6 +125,9 @@ function doneDefinition(facts: ProjectFacts): string[] {
  * template must never claim what it cannot know.
  */
 export function generateAgentsMd(facts: ProjectFacts): string {
+  // Stamped like every other generated file. It carries the pack version the bare
+  // `<!-- etymd pack vN -->` comment used to, and answers the question that comment could not:
+  // whether anyone has filled this contract in yet, or it is still untouched boilerplate.
   const run = runPrefix(facts.packageManager)
   const done = doneDefinition(facts)
   // "none detected" stays true with or without a manifest; "see package.json" lied in docs-only
@@ -128,7 +137,8 @@ export function generateAgentsMd(facts: ProjectFacts): string {
     facts.workspace.kind === "none" ? "single package" : `${facts.workspace.kind} workspace`
   const topDirs = facts.tree.dirs.slice(0, 14)
 
-  return `# AGENTS.md
+  return stampGenerated(
+    `# AGENTS.md
 
 Operating contract for AI agents working in **${facts.name}**. One source of truth — most agents
 (Claude Code, Codex, Cursor, Copilot, Gemini, …) read this file natively. Kept true by
@@ -181,8 +191,9 @@ ${
 }
 \`\`\`
 
-<!-- etymd pack v${PACK_VERSION} -->
-`
+`,
+    "md",
+  )
 }
 
 /**

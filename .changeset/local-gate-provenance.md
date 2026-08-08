@@ -40,4 +40,16 @@ A hook generated before the stamp existed carries no stamp and cannot be proven 
 is kept — now with the reason and the way out stated, instead of a dead end. One regeneration
 makes it provable from then on.
 
+**Provenance applies to everything the pack generates, not just hooks.** The `AGENTS.md` scaffold
+is stamped too, in an HTML comment so it stays invisible in the rendered document; its stamp
+replaces the bare `<!-- etymd pack vN -->` line, carrying the same version plus the provenance.
+`.etymd/config.json` is excluded — it holds the user's recorded decisions, is merged into rather
+than generated, and JSON has nowhere to hide a stamp.
+
+**The fleet sweep stops recommending a command that would refuse.** `fleet` reported every
+differing gate under one finding whose action was "re-run `etymd gates`" — advice that does not
+work for a hand-edited hook. A provably-edited gate is now disclosed as a customisation rather
+than reported as drift; stale and unstamped gates stay in the finding, since being unable to prove
+a file was touched is not evidence that it was.
+
 `PACK_VERSION` moves to 6: the generated files change meaning.

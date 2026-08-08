@@ -907,6 +907,47 @@ describe("fleet gate drift", () => {
     expect(findings.filter((f) => f.id.includes("gate-")).map((f) => f.id)).toEqual([])
   })
 
+  it("reports a provably-stale gate, and discloses a customised one instead of flagging it", async () => {
+    // The two halves of "differs" pull opposite ways at fleet scale too. A gate etymd wrote and
+    // nobody touched is drift the tool can close by itself. A gate someone edited is a decision —
+    // and telling its owner to re-run `etymd gates` points them at a command that will refuse.
+    await initRepo("mixed")
+    const root = path.join(dir, "mixed")
+    const facts = await scanProject(root)
+    const planned = (await planWorkflow(root, facts, { agents: false, gates: true })).filter(
+      (p) => p.executable,
+    )
+    await fs.mkdir(path.join(root, ".githooks"), { recursive: true })
+    for (const f of planned) await write(path.join("mixed", f.path), f.contents)
+
+    // Staleness comes from the INPUTS moving, never from touching the file — editing it to
+    // simulate staleness is exactly what the stamp exists to tell apart. Adding a script changes
+    // what the pre-push gate would run while the file on disk stays byte-for-byte as written.
+    await write(
+      "mixed/package.json",
+      JSON.stringify({ name: "mixed", private: true, scripts: { typecheck: "tsc --noEmit" } }),
+    )
+    const stalePath = ".githooks/pre-push"
+    const editedPath = ".githooks/pre-commit"
+    const editedSource = planned.find((f) => f.path === editedPath)?.contents as string
+    await write(
+      path.join("mixed", editedPath),
+      editedSource.replace("exit 0", 'echo "mine"\nexit 0'),
+    )
+
+    const manifestPath = await writeHub([personal("mixed")])
+    const { findings, disclosures } = await collectWallFindings(await manifestAt(manifestPath))
+
+    // The stale hook is reported, and its action is one that will actually work.
+    const drift = findings.find((f) => f.id === "fleet-manifest/gate-stale:mixed")
+    expect(drift?.evidence.join(" ")).toContain(stalePath)
+    // The hand-edited hook is a customisation: disclosed, never accused, and never named as
+    // something `etymd gates` will fix.
+    expect(drift?.evidence.join(" ")).not.toContain(editedPath)
+    expect(disclosures.join(" ")).toContain(editedPath)
+    expect(disclosures.join(" ")).toContain("not drift")
+  })
+
   it("discloses a husky repo rather than flagging it — git runs one hook path", async () => {
     await initRepo("huskyrepo")
     await write("huskyrepo/package.json", JSON.stringify({ name: "h", devDependencies: {} }))

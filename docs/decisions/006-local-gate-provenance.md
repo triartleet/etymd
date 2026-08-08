@@ -118,10 +118,36 @@ the way out named, instead of the old dead end. It becomes provable the first ti
 regenerated. The asymmetry is deliberate: a stamp can prove a file is safe to replace, never that
 it is unsafe.
 
+## Decision 3 — provenance is a property of everything the pack generates
+
+The two defects above were both the tool guessing about a file it had authored. Fixing them only
+where they hurt would leave the same guess in place everywhere else, waiting. So the stamp is not
+a hook feature:
+
+**Every generated artifact carries it, in that file's own comment syntax.** Shell scripts take
+`#`, the `AGENTS.md` scaffold takes an HTML comment — a stamp that renders as visible text in the
+document it describes is a defect in the document. The scaffold's stamp replaces the bare
+`<!-- etymd pack vN -->` comment, carrying the same version plus the provenance, so the file gains
+information without gaining a line. It also answers a question that comment could not: whether
+anyone has filled the contract in yet, or it is still untouched boilerplate.
+
+`.etymd/config.json` is deliberately excluded. It is not generated — it is merged into, holds the
+user's recorded decisions, and JSON has no comment syntax to hide a stamp in.
+
+**The fleet sweep stops giving advice that will be refused.** `checkGateDrift` reported every
+differing gate under one finding whose action was "re-run `etymd gates`". For a hand-edited hook
+that command declines — so the sweep was telling an owner to run something that would not work,
+which is the same dishonesty as decision 2 one level up. A provably-edited gate is now disclosed
+as a customisation rather than reported as drift; `stale` and `unstamped` stay in the finding,
+because "cannot prove it was touched" is not evidence that it was.
+
+Note the direction: this **removes** reports rather than adding them. Splitting a bucket usually
+grows the surface — here the honest half of it was never drift to begin with.
+
 ## What this cost the design
 
 Nothing on the objective axis. No predicate was added, no lens, no configuration field, no new
-finding id — decision 1 removes a false finding, decision 2 removes a false refusal. Both are the
-tool learning to read what it already wrote.
+finding id — decision 1 removes a false finding, decision 2 removes a false refusal, decision 3
+removes a false instruction. All three are the tool learning to read what it already wrote.
 
 `PACK_VERSION` moves to 6: the generated files change meaning.

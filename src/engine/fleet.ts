@@ -678,7 +678,20 @@ async function checkGateDrift(
     ).filter((f) => f.executable)
 
     const missing = planned.filter((f) => !f.exists).map((f) => f.path)
-    const stale = planned.filter((f) => f.exists && f.differs).map((f) => f.path)
+    // A file that DIFFERS splits two ways, and the split changes the advice. A gate etymd
+    // generated and nobody touched is drift the tool can close by itself. A gate someone edited
+    // is a decision, not drift — and telling its owner to "re-run `etymd gates`" points them at a
+    // command that will refuse, which is the same dishonesty this sweep exists to catch, one
+    // level up. Provably-edited files are disclosed instead; unstamped ones stay in the finding,
+    // since "cannot prove it was touched" is not evidence that it was.
+    const differing = planned.filter((f) => f.exists && f.differs)
+    const stale = differing.filter((f) => f.drift !== "edited").map((f) => f.path)
+    const edited = differing.filter((f) => f.drift === "edited").map((f) => f.path)
+    if (edited.length) {
+      disclosures.push(
+        `${entry.name}: ${edited.join(", ")} edited since etymd generated ${edited.length === 1 ? "it" : "them"} — a customisation, not drift; etymd will not overwrite ${edited.length === 1 ? "it" : "them"}`,
+      )
+    }
 
     if (missing.length) {
       findings.push(
@@ -699,8 +712,8 @@ async function checkGateDrift(
           "polish",
           `\`${entry.name}\` has ${stale.length} gate${stale.length === 1 ? "" : "s"} that differ from what its own inputs generate`,
           stale.map((s) => `${entry.name}: ${s}`),
-          "A hand-edited or outdated hook drifts from the pack silently — the repo believes it runs checks the file no longer contains.",
-          "Re-run `etymd gates` (it asks before overwriting), or record the intent in .etymd/config.json.",
+          "An outdated hook drifts from the pack silently — the repo believes it runs checks the file no longer contains.",
+          "Re-run `etymd gates` in that repo — it regenerates a gate it provably wrote and asks before touching anything else.",
         ),
       )
     }

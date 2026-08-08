@@ -62,7 +62,11 @@ describe("generateAgentsMd (minimal scaffold)", () => {
     expect(md).toContain("pnpm test")
     expect(md).toContain("Done =")
     expect(md).toContain("Advisory, not authoritative")
-    expect(md).toContain("etymd pack v")
+    // The stamp carries the pack version the bare comment used to, and adds provenance.
+    expect(md).toContain("etymd:generated pack-v")
+    // It must be a comment, not rendered text — a stamp visible in the reader's document is a
+    // defect in the document.
+    expect(md.trimEnd().endsWith("-->")).toBe(true)
     // The scaffold must not claim what the scan cannot know.
     expect(md).not.toContain("PROJECT_CONTEXT.md")
   })
@@ -283,6 +287,19 @@ describe("generation stamp: stale vs hand-edited", () => {
 
   it("stamps deterministically, so an unchanged repo still reads as `same`", () => {
     expect(generatePrePushHook(facts())).toBe(generatePrePushHook(facts()))
+    expect(generateAgentsMd(facts())).toBe(generateAgentsMd(facts()))
+  })
+
+  it("stamps the scaffold in the file's own comment syntax, and reads it back", () => {
+    // Every artifact the pack generates carries provenance, not just the shell ones — but a
+    // stamp that renders as text in the document it describes is a defect in the document.
+    const md = generateAgentsMd(facts())
+    expect(fileOrigin(md)).toBe("pack")
+    expect(md).not.toContain("\n# etymd:generated")
+    // The scaffold exists to be filled in; the moment it is, it stops being ours to replace.
+    expect(
+      fileOrigin(md.replace("## Stack", "## What this project is\n\nA real answer.\n\n## Stack")),
+    ).toBe("edited")
   })
 
   it("marks a hook stale when the repo's inputs moved under it, and edited when a human did", async () => {
