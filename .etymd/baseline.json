@@ -1,18 +1,18 @@
 {
-  "packVersion": "3",
-  "etymdVersion": "0.3.1",
-  "approvedAt": "2026-08-07T11:58:05.489Z",
+  "packVersion": "6",
+  "etymdVersion": "0.6.0",
+  "approvedAt": "2026-08-08T17:47:07.573Z",
   "profile": "solo",
   "facts": {
-    "etymdVersion": "0.3.1",
-    "packVersion": "3",
-    "generatedAt": "2026-08-07T11:58:05.487Z",
+    "etymdVersion": "0.6.0",
+    "packVersion": "6",
+    "generatedAt": "2026-08-08T17:47:07.571Z",
     "root": ".",
     "name": "etymd",
     "git": {
       "isRepo": true,
       "branch": "main",
-      "head": "4abf3e9",
+      "head": "a2f67e5",
       "hooksPath": ".githooks",
       "husky": false,
       "recentAuthors": 1
@@ -39,8 +39,7 @@
         "prepare": "npm run build",
         "prepublishOnly": "npm run build && ./scripts/artifact-check.sh",
         "changeset": "changeset",
-        "version:packages": "changeset version",
-        "release": "npm run build && changeset publish"
+        "version:packages": "changeset version"
       },
       "formatCheck": "format:check",
       "typecheck": "typecheck",
@@ -200,13 +199,16 @@
         "exists": false
       }
     ],
+    "shell": {
+      "scripts": 4
+    },
     "freshness": {
-      "repoLastCommit": "2026-08-07T13:57:22+02:00",
+      "repoLastCommit": "2026-08-08T18:44:35+02:00",
       "artifacts": [
         {
           "artifactId": "decisions-dir",
           "path": "docs/decisions",
-          "lastCommit": "2026-08-07T08:48:31+02:00",
+          "lastCommit": "2026-08-08T17:33:57+02:00",
           "commitsSince": true
         }
       ],
@@ -224,11 +226,11 @@
         },
         {
           "name": "docs",
-          "files": 6
+          "files": 7
         },
         {
           "name": ".githooks",
-          "files": 3
+          "files": 5
         },
         {
           "name": ".changeset",
