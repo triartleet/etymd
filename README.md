@@ -494,9 +494,10 @@ Without it — on a fresh clone or in CI — those suites skip cleanly and the r
 
 [`docs/decisions/`](https://github.com/triartleet/etymd/tree/main/docs/decisions) — 001 founding · 002 foundation re-lock · **003 the truth-guard
 pivot** (the current identity; includes the state-of-the-field investigation it rests on) ·
-**004 fleet mode** (the truth guard across your repositories).
-[`ROADMAP.md`](https://github.com/triartleet/etymd/blob/main/ROADMAP.md) — what's now / next / later, the pre-publish checklist, and the
-accepted heuristic trade-offs.
+**004 fleet mode** (the truth guard across your repositories) · 005 declared rules (design only) ·
+**006 local gate provenance** (what the tool may read, and what it may rewrite).
+[`ROADMAP.md`](https://github.com/triartleet/etymd/blob/main/ROADMAP.md) — what's now / next / later, and the accepted heuristic
+trade-offs.
 
 ## License
 

@@ -12,3 +12,7 @@ coverage/
 sources.local.json
 # Fleet sweep delta baselines are local-only (the README tells manifest repos the same).
 *.fleet.json
+# Machine-local notes. Operating detail — release mechanics above all — attracts account and
+# environment specifics, which a public repo must never carry. The pattern is the guard: the
+# runbook has a home that is not a tracked file, so the detail stops reaching for one.
+*.local.md

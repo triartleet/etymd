@@ -111,17 +111,6 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
 - Editor surfacing (problems-panel via `--json`) — but LSP/autofix stay agnix's lane; re-evaluate
   before ever entering it.
 
-## Pre-publish checklist (publish is HELD by the owner)
-
-1. **Claim the npm name** — `etymd` verified available 2026-07-24; the hold is squat exposure.
-   First publish claims it (no placeholder-squatting; publish the real 0.0.1).
-2. `package.json`: add `repository` / `homepage` / `bugs` once a remote exists; review the
-   `author` field before first publish.
-3. Activate CI (`.github/workflows/ci.yml` is ready; needs the GitHub remote).
-4. Competitive re-check: has agnix / agents-lint added baselines, ledgers, or budgets since
-   July 2026? Positioning in 003 assumes they have not.
-5. Changeset + `npm run release` (changesets config is in place).
-
 ## Known limitations (accepted trade-offs, not bugs)
 
 - **Extensionless file references go unchecked.** `lib/barcode-scan` (no extension, no trailing

@@ -89,7 +89,9 @@ over repo-wide scans.
 - `docs/decisions/` — the decision record (001 founding · 002 foundation re-lock · 003 truth-guard
   pivot — the current identity · 004 fleet mode · 005 declared rules, design only · 006 local gate
   provenance)
-- `ROADMAP.md` — now/next/later, the pre-publish checklist, accepted heuristic trade-offs
+- `ROADMAP.md` — now/next/later, accepted heuristic trade-offs (release mechanics are a
+  machine-local runbook, deliberately untracked: operating detail attracts account and
+  environment specifics a public repo must not carry)
 
 ## Composition points
 
