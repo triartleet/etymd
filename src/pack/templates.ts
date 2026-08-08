@@ -1,6 +1,62 @@
+import { createHash } from "node:crypto"
+
 import type { GateConfig } from "../core/config.js"
 import type { PackageManager, ProjectFacts } from "../core/types.js"
 import { PACK_VERSION } from "./version.js"
+
+/**
+ * The generation stamp — the line that tells a stale gate apart from a customised one.
+ *
+ * Without it, "the file on disk is not what the pack would write" has two causes with opposite
+ * correct responses: a human customised it (never clobber), or the repo's own inputs moved on —
+ * a renamed script, a changed package manager, an older pack — and the file is now a gate that
+ * no longer matches the repo (regenerate). Treating both as hand-edited preserves the broken
+ * one, and the only escape is deleting the file, which nobody would think to try.
+ *
+ * A stamp turns the guess into a proof. The digest covers the file MINUS this line, so a file
+ * that still hashes to its own stamp is byte-for-byte what etymd wrote and cannot contain
+ * anyone's work; any edit, including to the stamp itself, breaks the match and the file is
+ * treated as hand-authored again. Absent stamp = unknowable, and unknowable is kept.
+ *
+ * This does not reopen the "marked region" question that generation deliberately avoids: the
+ * stamp is pack-owned output, regenerated with the file and never a place to write anything.
+ * The repo's own text still lives in the `.local` companion, which etymd does not read or write.
+ */
+const GENERATION_MARKER_RE = /^# etymd:generated pack-v\S+ ([0-9a-f]{16})$/
+
+function digestOf(body: string): string {
+  return createHash("sha256").update(body).digest("hex").slice(0, 16)
+}
+
+/** Append the stamp. Deterministic: the same body always yields the same bytes. */
+export function stampGenerated(body: string): string {
+  return `${body}# etymd:generated pack-v${PACK_VERSION} ${digestOf(body)}\n`
+}
+
+export type FileOrigin =
+  /** Byte-for-byte etymd's own output — safe to regenerate, holds nobody's work. */
+  | "pack"
+  /** Stamped, but the bytes moved since — someone edited it. Never clobber. */
+  | "edited"
+  /** No stamp: hand-written, or generated before stamping existed. Unknowable, so kept. */
+  | "unstamped"
+
+/**
+ * The stamp is written last, but it is searched for ANYWHERE — an edit that appends below it is
+ * still an edit, and pinning the search to the final line would read that file as unstamped and
+ * report a known hand-edit as merely unknowable. Whichever line it is, removing it must
+ * reconstruct the exact bytes that were hashed, or the file is not ours to overwrite.
+ */
+export function fileOrigin(text: string): FileOrigin {
+  const lines = text.split("\n")
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const match = GENERATION_MARKER_RE.exec(lines[i] as string)
+    if (!match) continue
+    const body = [...lines.slice(0, i), ...lines.slice(i + 1)].join("\n")
+    return digestOf(body) === match[1] ? "pack" : "edited"
+  }
+  return "unstamped"
+}
 
 export function runPrefix(pm: PackageManager): string {
   switch (pm) {
@@ -168,7 +224,7 @@ fi`
 }
 
 export function generatePreCommitHook(): string {
-  return `#!/usr/bin/env sh
+  return stampGenerated(`#!/usr/bin/env sh
 # etymd: process gate. Cheap, locally-knowable checks belong here (fast, blocks the commit).
 
 ${localHookCall("pre-commit")}
@@ -185,7 +241,7 @@ if [ -x "$GATE" ]; then
 fi
 
 exit 0
-`
+`)
 }
 
 /**
@@ -194,7 +250,7 @@ exit 0
  * commit messages rather than files, which is why this is its own door.
  */
 export function generateCommitMsgHook(): string {
-  return `#!/usr/bin/env sh
+  return stampGenerated(`#!/usr/bin/env sh
 # etymd: content screen — the commit message itself.
 #
 # The staged-content gate reads file bytes and never sees the message, yet a message is as
@@ -209,7 +265,7 @@ fi
 ${localHookCall("commit-msg")}
 
 exit 0
-`
+`)
 }
 
 /**
@@ -294,7 +350,7 @@ if command -v etymd >/dev/null 2>&1; then
 else
   echo "› etymd audit skipped (not on PATH)"
 fi`
-  return `#!/usr/bin/env sh
+  return stampGenerated(`#!/usr/bin/env sh
 # etymd: correctness gate. Mirrors CI cheapest-first; blocks the push on any failure.
 
 ${localHookCall("pre-push")}
@@ -310,7 +366,7 @@ if [ -x "$GATE" ] && [ "\${CONTENT_GATE_PREPUSH:-1}" = "1" ]; then
 fi
 
 exit 0
-`
+`)
 }
 
 /**
@@ -322,7 +378,7 @@ exit 0
  * This builds what the project would publish, unpacks it, and screens the result.
  */
 export function generateArtifactCheckScript(): string {
-  return `#!/usr/bin/env sh
+  return stampGenerated(`#!/usr/bin/env sh
 # etymd: content screen — the published ARTIFACT, not the repository.
 #
 # Wire it into the irreversible moment:
@@ -351,5 +407,5 @@ fi
 
 "$GATE" screen --dir "$WORK" || exit 1
 exit 0
-`
+`)
 }

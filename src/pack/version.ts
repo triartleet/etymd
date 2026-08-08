@@ -3,4 +3,4 @@
  * change meaning. Stamped into facts, baselines, and generated artifacts so drift against the
  * pack is computable and `harvest` has something to diff.
  */
-export const PACK_VERSION = "5"
+export const PACK_VERSION = "6"

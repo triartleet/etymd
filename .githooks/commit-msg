@@ -18,3 +18,4 @@ if [ -x "$LOCAL" ]; then
 fi
 
 exit 0
+# etymd:generated pack-v6 9957045a5e89b703

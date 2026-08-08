@@ -228,7 +228,7 @@ export async function run(opts: GatesOptions): Promise<void> {
     return files.filter((f) => f.executable)
   }
   let gateFiles = await plan()
-  renderPlan(gateFiles)
+  renderPlan(gateFiles, { regeneratesStale: true })
   printGateSummary(gateConfig, facts, configSource)
 
   if (!opts.yes) {
@@ -262,16 +262,25 @@ export async function run(opts: GatesOptions): Promise<void> {
   }
 
   // A hand-edited hook is never silently clobbered — per-file consent when contents differ.
+  //
+  // But "differs" alone was doing two jobs. A hook etymd generated and nobody touched since
+  // differs the moment the repo's own inputs move — a renamed script, a changed package manager,
+  // a newer pack — and refusing THAT is not protection: it pins a gate that has stopped matching
+  // the repo, while `etymd audit` goes on reporting the gaps the refused rewrite would close.
+  // The stamp separates the cases, so consent is asked only where something could be lost.
   const overwrite = new Set<string>()
   for (const f of gateFiles) {
     if (!f.exists) continue
-    if (!f.differs) {
+    if (!f.differs || f.drift === "stale") {
       overwrite.add(f.path)
       continue
     }
     if (opts.yes) continue
     const ow = await confirm({
-      message: `${f.path} exists with different content (hand-edited?). Overwrite with the pack version?`,
+      message:
+        f.drift === "edited"
+          ? `${f.path} has been edited since etymd generated it. Overwrite with the pack version?`
+          : `${f.path} carries no etymd generation stamp, so it may be hand-written. Overwrite with the pack version?`,
       initialValue: false,
     })
     if (isCancel(ow)) {
@@ -286,8 +295,18 @@ export async function run(opts: GatesOptions): Promise<void> {
 
   section("Done")
   for (const w of result.written) print(`  ${glyph.ok} ${theme.dim("wrote")} ${theme.info(w)}`)
-  for (const sk of result.skipped)
-    print(`  ${glyph.bullet} ${theme.dim("kept (hand-edited)")} ${theme.dim(sk)}`)
+  // Say which of the two reasons applied, and name the way out. The refusal used to be a dead
+  // end: one message for every case, and nothing pointing at the next move.
+  for (const sk of result.skipped) {
+    const drift = gateFiles.find((f) => f.path === sk)?.drift
+    const reason = drift === "edited" ? "kept (edited since generated)" : "kept (no etymd stamp)"
+    print(`  ${glyph.bullet} ${theme.dim(reason)} ${theme.dim(sk)}`)
+    if (opts.yes) {
+      print(
+        `    ${theme.dim("its content differs from what this repo now generates — re-run without --yes to review and overwrite")}`,
+      )
+    }
+  }
   print(`  ${glyph.ok} ${theme.dim("set")} ${theme.code("core.hooksPath = .githooks")}`)
 
   // The publish door needs one line in package.json to fire. The plan already showed it and the

@@ -195,6 +195,20 @@ export const gateIntegrityLens: Lens = {
     }
     if (inv.ci.parseErrors.length)
       disclosures.push(...inv.ci.parseErrors.map((e) => `CI parse: ${e}`))
+    // What a hook enforces THROUGH its companion is counted as local enforcement — say so, so a
+    // reader can see why a tool CI also runs is not reported as a shift-left gap.
+    if (inv.local.companions.length) {
+      disclosures.push(
+        `Checks in ${inv.local.companions.join(", ")} are counted as locally enforced — the generated hook calls the companion, and etymd reads it without owning it.`,
+      )
+    }
+    // The opposite case, and a silent one: the call is there, the file is there, the execute bit
+    // is not — so the hook's `[ -x ]` test skips it on every push.
+    if (inv.local.inertCompanions.length) {
+      disclosures.push(
+        `${inv.local.inertCompanions.join(", ")} ${inv.local.inertCompanions.length === 1 ? "is" : "are"} called by a hook but not executable — the hook's \`[ -x ]\` test skips ${inv.local.inertCompanions.length === 1 ? "it" : "them"}, so any check inside is NOT counted as enforced. \`chmod +x\` makes it run.`,
+      )
+    }
     if (inv.ci.system === "none")
       disclosures.push("No CI configuration found — CI↔local comparisons skipped.")
 

@@ -1,6 +1,7 @@
 import path from "node:path"
 
 import {
+  fileOrigin,
   generateAgentsMd,
   generateArtifactCheckScript,
   generateCommitMsgHook,
@@ -36,8 +37,15 @@ export interface GeneratedFile {
   contents: string
   /** Present on disk already — apply will skip or ask before overwriting. */
   exists: boolean
-  /** The existing file's content differs from what the pack would generate (hand-edited or stale). */
+  /** The existing file's content differs from what the pack would generate. */
   differs?: boolean
+  /**
+   * WHY it differs, when it does — the two cases pull in opposite directions and must not share
+   * a bucket. `stale` is provably etymd's own output against inputs that have since moved (an
+   * older pack, a renamed script, a changed package manager): regenerating it destroys nothing.
+   * `edited` and `unstamped` may hold someone's work, so they are kept.
+   */
+  drift?: "stale" | "edited" | "unstamped"
   /** Hooks need the executable bit. */
   executable?: boolean
   label: string
@@ -68,11 +76,17 @@ export async function planWorkflow(
     const abs = path.join(root, rel)
     const exists = await pathExists(abs)
     const existing = exists ? await readText(abs) : null
+    const differs = exists ? existing !== contents : undefined
+    // The stamp answers "is this still exactly what we wrote?", which is the only question that
+    // makes overwriting safe. Everything else — including an unstamped file we may well have
+    // written under an older version — stays in the keep-it bucket.
+    const origin = differs && existing !== null ? fileOrigin(existing) : undefined
     out.push({
       path: rel,
       contents,
       exists,
-      differs: exists ? existing !== contents : undefined,
+      differs,
+      drift: origin === "pack" ? "stale" : origin,
       executable,
       label,
     })

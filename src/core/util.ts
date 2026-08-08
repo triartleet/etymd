@@ -39,6 +39,25 @@ export async function isDirectory(p: string): Promise<boolean> {
   }
 }
 
+/**
+ * Mirror of a shell `[ -x "$f" ]` test on a file that exists.
+ *
+ * Returns null where the answer is not knowable rather than guessing: Windows has no POSIX
+ * execute bit, so `mode` there says nothing about whether the shell running the hook would
+ * consider the file executable. A caller must decide what to do with "unknown" — reporting it
+ * as not-executable would invent a silent gate that may well be running.
+ */
+export async function isExecutable(p: string): Promise<boolean | null> {
+  try {
+    const stat = await fs.stat(p)
+    if (!stat.isFile()) return false
+    if (process.platform === "win32") return null
+    return (stat.mode & 0o111) !== 0
+  } catch {
+    return false
+  }
+}
+
 /** Run git in a repo, returning trimmed stdout or null on any failure (never throws). */
 export async function git(root: string, args: string[]): Promise<string | null> {
   try {

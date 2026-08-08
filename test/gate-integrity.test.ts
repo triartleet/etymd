@@ -262,6 +262,98 @@ jobs:
   })
 })
 
+// The blind spot behind a dismissal that should never have been needed: a repo wired a check
+// into the companion the generated hook calls, proved it blocks the push by running the hook,
+// and the lens still reported the check as CI-only. Etymd EMITS that include, so failing to
+// follow it is the tool not reading its own output — and a dismissal is for a false positive
+// or an accepted trade-off, never for something the tool simply cannot see.
+describe("checks wired through the <hook>.local companion", () => {
+  const PACKAGE = JSON.stringify({
+    name: "companion",
+    scripts: { test: "vitest run", typecheck: "tsc --noEmit" },
+  })
+  const CI = `on: push
+jobs:
+  check:
+    steps:
+      - run: npm test
+      - run: npm run typecheck
+`
+  // The include exactly as the pack emits it.
+  const HOOK = `#!/usr/bin/env sh
+LOCAL="$(dirname "$0")/pre-push.local"
+if [ -x "$LOCAL" ]; then
+  "$LOCAL" "$@" || exit 1
+fi
+npm run typecheck || exit 1
+exit 0
+`
+  const COMPANION = `#!/usr/bin/env sh
+npm test || exit 1
+`
+
+  async function fixture(opts: { companion?: string; executable?: boolean; hook?: string } = {}) {
+    await write("package.json", PACKAGE)
+    await write(".github/workflows/ci.yml", CI)
+    await write(".githooks/pre-push", opts.hook ?? HOOK)
+    await fs.chmod(path.join(dir, ".githooks/pre-push"), 0o755)
+    if (opts.companion !== undefined) {
+      await write(".githooks/pre-push.local", opts.companion)
+      await fs.chmod(path.join(dir, ".githooks/pre-push.local"), opts.executable ? 0o755 : 0o644)
+    }
+    const facts = await scanProject(dir)
+    return buildGateInventory(dir, facts)
+  }
+
+  it("counts a check that lives in the companion as locally enforced", async () => {
+    const inv = await fixture({ companion: COMPANION, executable: true })
+    expect(inv.local.prePush).toContain("test")
+    expect(inv.local.companions).toContain(".githooks/pre-push.local")
+    expect(deriveGateFindings(inv).map((f) => f.id)).not.toContain("gate-integrity/ci-only-test")
+  })
+
+  it("discloses that the companion is where the enforcement came from", async () => {
+    const inv = await fixture({ companion: COMPANION, executable: true })
+    const disclosures: string[] = []
+    deriveGateFindings(inv, disclosures)
+    const all = [...disclosures, ...inv.local.companions].join(" ")
+    expect(all).toContain(".githooks/pre-push.local")
+  })
+
+  // The two ways a companion does NOT run. Following the include must not become a blanket
+  // assumption that any sibling file counts — that would trade a false accusation for a false
+  // all-clear, which is the more expensive of the two for a gate.
+  it("does not count a companion the hook never calls", async () => {
+    const inv = await fixture({
+      companion: COMPANION,
+      executable: true,
+      hook: "#!/usr/bin/env sh\nnpm run typecheck || exit 1\nexit 0\n",
+    })
+    expect(inv.local.prePush).not.toContain("test")
+    expect(inv.local.companions).toEqual([])
+    expect(deriveGateFindings(inv).map((f) => f.id)).toContain("gate-integrity/ci-only-test")
+  })
+
+  // Windows has no POSIX execute bit, so the detector deliberately declines to answer there
+  // rather than invent a dead gate — which makes this assertion Unix-only by design.
+  it.skipIf(process.platform === "win32")(
+    "does not count a companion without the execute bit — the hook's own `[ -x ]` skips it",
+    async () => {
+      const inv = await fixture({ companion: COMPANION, executable: false })
+      expect(inv.local.prePush).not.toContain("test")
+      expect(inv.local.inertCompanions).toContain(".githooks/pre-push.local")
+      expect(deriveGateFindings(inv).map((f) => f.id)).toContain("gate-integrity/ci-only-test")
+    },
+  )
+
+  it("is unbothered by an absent companion", async () => {
+    const inv = await fixture()
+    expect(inv.local.companions).toEqual([])
+    expect(inv.local.inertCompanions).toEqual([])
+    expect(inv.local.prePush).toContain("typecheck")
+  })
+})
+
 describe("hook wiring is a developer-machine fact, not a CI one", () => {
   // A CI checkout never has git config, so core.hooksPath is ALWAYS unset there. Accusing it
   // would fail the very `etymd audit --fail-on risk` gate the README tells users to add — in

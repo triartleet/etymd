@@ -151,5 +151,16 @@ not serve it does not ship. Decision record: [`docs/decisions/003-truth-guard-pi
 - **Workspace-filtered commands** (`pnpm --filter x test`) are skipped, counted, and disclosed —
   not resolved into the target package.
 - **Sonar/server-side thresholds** cannot be read from the repo; findings say exactly that.
+- **A hook generated before the generation stamp existed cannot be proven untouched.** It has no
+  stamp, so `etymd gates` keeps it rather than regenerating — stating the reason and the way out
+  instead of the old silent `kept (hand-edited)`. One regeneration makes it provable from then on.
+  The asymmetry is deliberate (decision
+  [006](docs/decisions/006-local-gate-provenance.md)): a stamp can prove a file is safe to
+  replace, never that it is unsafe.
+- **A companion (`<hook>.local`) without the execute bit is not counted as enforcement.** The
+  generated hook guards the call with `[ -x ]`, so such a file never runs; the lens mirrors that
+  and reports it as inert rather than crediting checks that do not fire. Where the execute bit is
+  not a meaningful question (no POSIX mode bits), the checks are counted rather than a dead gate
+  invented.
 - Precision over recall throughout: a false "your file is lying" costs more trust than a missed
   lie. Every skip class is disclosed in the lens report.

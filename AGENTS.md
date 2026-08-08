@@ -87,7 +87,8 @@ over repo-wide scans.
 - `test/` — vitest suites incl. `truth.test.ts` (the lying-fixture) and `corpus.test.ts`
   (read-only sibling-repo smokes)
 - `docs/decisions/` — the decision record (001 founding · 002 foundation re-lock · 003 truth-guard
-  pivot — the current identity · 004 fleet mode)
+  pivot — the current identity · 004 fleet mode · 005 declared rules, design only · 006 local gate
+  provenance)
 - `ROADMAP.md` — now/next/later, the pre-publish checklist, accepted heuristic trade-offs
 
 ## Composition points

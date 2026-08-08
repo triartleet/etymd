@@ -135,18 +135,49 @@ export function renderContext(budget: ContextBudget, threshold: number): void {
   }
 }
 
-/** A create/exists/differs summary for a set of planned files. */
+/**
+ * A create/same/stale/differs summary for a set of planned files.
+ *
+ * `stale` and `differs` are deliberately separate tags. Both mean "not what the pack would
+ * write", but only one of them is about to be overwritten, and a plan that shows the same word
+ * for a file it will replace and a file it will keep is not a plan the reader can act on.
+ *
+ * `regeneratesStale` is the caller's promise about what it does next — `gates` rewrites a stale
+ * file, onboarding never overwrites anything — so the note describes that caller's behaviour
+ * rather than asserting a fate the renderer cannot know.
+ */
 export function renderPlan(
-  files: { path: string; exists: boolean; differs?: boolean; label: string }[],
+  files: {
+    path: string
+    exists: boolean
+    differs?: boolean
+    drift?: "stale" | "edited" | "unstamped"
+    label: string
+  }[],
+  opts: { regeneratesStale?: boolean } = {},
 ): void {
   section("Plan")
   for (const f of files) {
+    const stale = f.differs && f.drift === "stale"
     const tag = !f.exists
       ? theme.ok("create")
-      : f.differs
-        ? theme.warn("differs")
-        : theme.dim("same")
-    print(`  ${pc.dim("[")}${tag}${pc.dim("]")} ${theme.info(f.path)}  ${theme.dim(f.label)}`)
+      : stale
+        ? theme.warn("stale")
+        : f.differs
+          ? theme.warn("differs")
+          : theme.dim("same")
+    const note = !f.differs
+      ? ""
+      : stale
+        ? opts.regeneratesStale
+          ? " — unedited since etymd generated it; regenerating"
+          : " — unedited since etymd generated it"
+        : f.drift === "edited"
+          ? " — hand-edited since etymd generated it; keeping"
+          : " — no etymd generation stamp; keeping"
+    print(
+      `  ${pc.dim("[")}${tag}${pc.dim("]")} ${theme.info(f.path)}  ${theme.dim(f.label)}${theme.dim(note)}`,
+    )
   }
 }
 

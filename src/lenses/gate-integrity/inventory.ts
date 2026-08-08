@@ -3,7 +3,7 @@ import path from "node:path"
 import YAML from "yaml"
 
 import type { ProjectFacts } from "../../core/types.js"
-import { pathExists, readJson, readText } from "../../core/util.js"
+import { isExecutable, pathExists, readJson, readText } from "../../core/util.js"
 
 // The gate inventory: every quality gate the project runs, locally and in CI, matched against
 // a tool registry. Deterministic; the lens turns it into findings. Honesty is structural here:
@@ -44,6 +44,10 @@ export interface GateInventory {
     prePush: GateTool[]
     commitMsg: GateTool[]
     lintStaged: GateTool[]
+    /** Companion files the hooks call and whose checks ARE counted above. */
+    companions: string[]
+    /** Companions a hook calls that exist but lack the execute bit — the call skips them. */
+    inertCompanions: string[]
   }
   ci: {
     system: ProjectFacts["ci"]["system"]
@@ -383,6 +387,40 @@ function parseGithubWorkflow(
   return { jobs, parseErrors }
 }
 
+/**
+ * Resolve the `<hook>.local` companion a hook calls, and report the tools it enforces.
+ *
+ * Following this include is not inference. The pack EMITS the call (`pack/templates.ts` writes
+ * `LOCAL="$(dirname "$0")/<hook>.local"` into every generated hook) and documents the companion
+ * as the sanctioned place for project-specific guards, so a check living there runs on every
+ * push exactly like one written inline. A lens that stops at the hook file reports those checks
+ * as absent and tells the user to wire in a gate they already wired — and the only way to
+ * silence that is a dismissal, which is meant for a false positive, not for a blind spot.
+ *
+ * Two conditions keep it precise, both mirroring what the shell actually does:
+ * the hook must genuinely reference the companion (a hand-written hook that does not call it
+ * gets nothing attributed to it), and the companion must pass the same `[ -x ]` test the hook
+ * applies before running it. A present-but-not-executable companion is silently skipped by the
+ * hook, so its checks are NOT counted — it is reported as inert instead.
+ */
+async function companionOf(
+  root: string,
+  hooksDir: string,
+  hook: string,
+  hookText: string,
+  scripts: Record<string, string>,
+): Promise<{ rel: string; tools: GateTool[]; inert: boolean } | null> {
+  const rel = path.posix.join(hooksDir.split(path.sep).join("/"), `${hook}.local`)
+  if (!hookText.includes(`${hook}.local`)) return null
+  const abs = path.join(root, hooksDir, `${hook}.local`)
+  const text = await readText(abs)
+  if (text === null) return null
+  // null = platform cannot answer (Windows): count it rather than invent a dead gate.
+  const executable = await isExecutable(abs)
+  if (executable === false) return { rel, tools: [], inert: true }
+  return { rel, tools: matchTools(text, scripts), inert: false }
+}
+
 async function localHookTools(
   root: string,
   facts: ProjectFacts,
@@ -390,10 +428,22 @@ async function localHookTools(
 ): Promise<GateInventory["local"]> {
   const hooks = facts.hooks
   const empty: GateTool[] = []
+  const companions: string[] = []
+  const inertCompanions: string[] = []
   const readHook = async (name: string): Promise<GateTool[]> => {
     if (!hooks.dir) return empty
     const text = await readText(path.join(root, hooks.dir, name))
-    return text ? matchTools(text, scripts) : empty
+    if (!text) return empty
+    const tools = new Set<GateTool>(matchTools(text, scripts))
+    const companion = await companionOf(root, hooks.dir, name, text, scripts)
+    if (companion) {
+      if (companion.inert) inertCompanions.push(companion.rel)
+      else {
+        companions.push(companion.rel)
+        for (const t of companion.tools) tools.add(t)
+      }
+    }
+    return [...tools]
   }
 
   let preCommit: GateTool[] = []
@@ -452,7 +502,16 @@ async function localHookTools(
         ? facts.git.hooksPath === hooks.dir
         : false
 
-  return { source: hooks.source, wired, preCommit, prePush, commitMsg, lintStaged }
+  return {
+    source: hooks.source,
+    wired,
+    preCommit,
+    prePush,
+    commitMsg,
+    lintStaged,
+    companions,
+    inertCompanions,
+  }
 }
 
 async function detectThresholds(

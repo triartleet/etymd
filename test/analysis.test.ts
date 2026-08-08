@@ -9,6 +9,7 @@ import { derivedCommands, planWorkflow } from "../src/core/generate.js"
 import { isDriftEmpty, summarizeBaselineDrift } from "../src/core/facts.js"
 import type { ProjectFacts } from "../src/core/types.js"
 import {
+  fileOrigin,
   generateAgentsMd,
   generateCommitMsgHook,
   generatePreCommitHook,
@@ -248,6 +249,75 @@ describe("planWorkflow", () => {
   it("plans nothing when both toggles are off", async () => {
     const plan = await planWorkflow("/nonexistent-root", facts(), { agents: false, gates: false })
     expect(plan).toEqual([])
+  })
+})
+
+// "Differs from what the pack would write" had two causes with opposite correct answers, and
+// one flag for both. The refusal that protects a customised hook was also preserving a hook
+// whose repo had moved on — a package manager change leaves the gate running the old one — and
+// the only escape was deleting the file, which nobody would think to try. Meanwhile the audit
+// went on reporting the very gaps the refused rewrite would have closed.
+describe("generation stamp: stale vs hand-edited", () => {
+  it("recognises its own untouched output", () => {
+    expect(fileOrigin(generatePrePushHook(facts()))).toBe("pack")
+    expect(fileOrigin(generatePreCommitHook())).toBe("pack")
+    expect(fileOrigin(generateCommitMsgHook())).toBe("pack")
+  })
+
+  it("PINNED: any edit breaks the match — including one made below the stamp", () => {
+    const hook = generatePrePushHook(facts())
+    expect(fileOrigin(hook.replace("exit 0", 'echo "mine"\nexit 0'))).toBe("edited")
+    expect(fileOrigin(hook + 'echo "appended after the stamp"\n')).toBe("edited")
+    // Tampering with the stamp itself must not launder the file into "unedited".
+    expect(fileOrigin(hook.replace(/pack-v\S+ [0-9a-f]{16}/, "pack-v6 " + "0".repeat(16)))).toBe(
+      "edited",
+    )
+  })
+
+  it("treats an unstamped file as unknowable, never as ours", () => {
+    // Hooks generated before stamping existed land here. Unknowable is kept, not overwritten:
+    // the stamp can prove a file is safe to replace, never that it is unsafe.
+    expect(fileOrigin("#!/usr/bin/env sh\nnpm run lint\n")).toBe("unstamped")
+    expect(fileOrigin("")).toBe("unstamped")
+  })
+
+  it("stamps deterministically, so an unchanged repo still reads as `same`", () => {
+    expect(generatePrePushHook(facts())).toBe(generatePrePushHook(facts()))
+  })
+
+  it("marks a hook stale when the repo's inputs moved under it, and edited when a human did", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "etymd-stamp-"))
+    try {
+      const npmFacts = facts({ packageManager: "npm" })
+      await fs.mkdir(path.join(root, ".githooks"), { recursive: true })
+      const asGenerated = generatePrePushHook(npmFacts)
+      await fs.writeFile(path.join(root, ".githooks/pre-push"), asGenerated, "utf8")
+
+      // Same inputs: nothing to do.
+      const unchanged = await planWorkflow(root, npmFacts, { agents: false, gates: true })
+      expect(unchanged.find((f) => f.path === ".githooks/pre-push")?.differs).toBe(false)
+
+      // The package manager changes — the hook now runs commands this repo no longer uses.
+      // Nobody touched the file, so regenerating it can destroy nothing.
+      const moved = await planWorkflow(root, facts({ packageManager: "pnpm" }), {
+        agents: false,
+        gates: true,
+      })
+      const stale = moved.find((f) => f.path === ".githooks/pre-push")
+      expect(stale?.differs).toBe(true)
+      expect(stale?.drift).toBe("stale")
+
+      // A human adds a guard — same "differs", opposite answer.
+      await fs.writeFile(
+        path.join(root, ".githooks/pre-push"),
+        asGenerated.replace("exit 0", 'echo "› bespoke guard"\nexit 0'),
+        "utf8",
+      )
+      const edited = await planWorkflow(root, npmFacts, { agents: false, gates: true })
+      expect(edited.find((f) => f.path === ".githooks/pre-push")?.drift).toBe("edited")
+    } finally {
+      await fs.rm(root, { recursive: true, force: true })
+    }
   })
 })
 
