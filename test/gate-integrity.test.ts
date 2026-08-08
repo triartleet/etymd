@@ -292,11 +292,21 @@ exit 0
 npm test || exit 1
 `
 
-  async function fixture(opts: { companion?: string; executable?: boolean; hook?: string } = {}) {
+  async function fixture(
+    opts: {
+      companion?: string
+      executable?: boolean
+      hook?: string
+      hookExecutable?: boolean
+    } = {},
+  ) {
     await write("package.json", PACKAGE)
     await write(".github/workflows/ci.yml", CI)
     await write(".githooks/pre-push", opts.hook ?? HOOK)
-    await fs.chmod(path.join(dir, ".githooks/pre-push"), 0o755)
+    await fs.chmod(
+      path.join(dir, ".githooks/pre-push"),
+      opts.hookExecutable === false ? 0o644 : 0o755,
+    )
     if (opts.companion !== undefined) {
       await write(".githooks/pre-push.local", opts.companion)
       await fs.chmod(path.join(dir, ".githooks/pre-push.local"), opts.executable ? 0o755 : 0o644)
@@ -343,6 +353,49 @@ npm test || exit 1
       expect(inv.local.prePush).not.toContain("test")
       expect(inv.local.inertCompanions).toContain(".githooks/pre-push.local")
       expect(deriveGateFindings(inv).map((f) => f.id)).toContain("gate-integrity/ci-only-test")
+    },
+  )
+
+  // A gate the repo believes in that cannot run is the silent failure this tool exists for, so it
+  // is a finding rather than a line in the disclosures — where it does not rank, does not gate,
+  // and does not reach the ledger.
+  it.skipIf(process.platform === "win32")(
+    "reports an unrunnable companion as a finding, with a fix that survives a fresh clone",
+    async () => {
+      const inv = await fixture({ companion: COMPANION, executable: false })
+      const found = deriveGateFindings(inv).find(
+        (f) => f.id === "gate-integrity/companion-not-executable",
+      )
+      expect(found).toBeDefined()
+      expect(found?.evidence).toContain(".githooks/pre-push.local")
+      // gap, not risk: risk is reserved for what makes an agent do the wrong thing, and shipping
+      // this at risk would fail the `--fail-on risk` gate etymd recommends in a repo whose code
+      // never changed.
+      expect(found?.tier).toBe("gap")
+      // An objective repo-state fact, not an opinion — so `doctor` must not skip it.
+      expect(found?.kind).toBe("truth")
+      // chmod alone does not survive a clone: git tracks exactly one permission bit.
+      expect(found?.action).toContain("update-index --chmod=+x")
+    },
+  )
+
+  // The guard that keeps the accusation honest. A filesystem carrying no execute bits reports
+  // everything as non-executable; the claim needs the ASYMMETRY of a hook that has the bit beside
+  // a companion that does not. Without it, every Windows or bit-dropping-mount checkout would be
+  // told its working gate is dead.
+  it.skipIf(process.platform === "win32")(
+    "never accuses when the hook beside it has no execute bit either — the bits prove nothing there",
+    async () => {
+      const inv = await fixture({ companion: COMPANION, executable: false, hookExecutable: false })
+      expect(inv.local.inertCompanions).toEqual([])
+      expect(inv.local.unverifiedCompanions).toContain(".githooks/pre-push.local")
+      // Counted rather than dropped, so no phantom CI-only gap either — and the uncertainty is
+      // disclosed instead of hidden.
+      expect(inv.local.prePush).toContain("test")
+      const disclosures: string[] = []
+      const ids = deriveGateFindings(inv, disclosures).map((f) => f.id)
+      expect(ids).not.toContain("gate-integrity/companion-not-executable")
+      expect(ids).not.toContain("gate-integrity/ci-only-test")
     },
   )
 

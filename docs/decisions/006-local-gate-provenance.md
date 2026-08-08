@@ -144,10 +144,49 @@ because "cannot prove it was touched" is not evidence that it was.
 Note the direction: this **removes** reports rather than adding them. Splitting a bucket usually
 grows the surface — here the honest half of it was never drift to begin with.
 
+## Decision 4 — an unrunnable companion is a finding, at `gap`
+
+Decision 1 left the inert case as a disclosure, which was the conservative move and the wrong one.
+A disclosure does not rank, does not gate, does not reach the ledger, and gets skimmed. Meanwhile
+the condition is precisely the silent failure this tool exists for: a check the repo believes it
+runs, that the `[ -x ]` guard skips every time, on a file etymd's own instructions told the user
+to create. It is also likely rather than theoretical — someone writing that file by hand will
+forget `chmod +x`, and git tracks exactly one permission bit, so the dead gate then propagates to
+every clone.
+
+**Tier: `gap`, not `risk`.** The obvious move was matching `hooks-not-wired`, which is risk — but
+that finding earns it because EVERY gate is dead there, which is what "makes an agent do the wrong
+thing" means. One companion not running is a missing safeguard, which is what `gap` means. The
+practical consequence points the same way: `--fail-on risk` fails only on risk findings, so
+shipping this at risk would break the push gate etymd itself recommends, on upgrade, in repos
+whose code never changed. Both readings agree, so the vocabulary decides it rather than caution.
+
+**Kind: `truth`.** The file is called, it is present, and the mode bit says it will be skipped —
+computed, not opined. So `doctor` must not skip it.
+
+**The guard that keeps it honest.** "Not executable" is only trusted where the execute bit is
+demonstrably meaningful, and the HOOK's own bit is what establishes that. A filesystem carrying no
+bits reports everything as non-executable, so an unguarded check would tell every such checkout
+that its working gate is dead. The claim therefore requires an asymmetry — the hook has the bit,
+the companion beside it does not. Where that cannot be established the checks are counted and the
+uncertainty is disclosed, never converted into an accusation. Three companion states result:
+counted, counted-but-unverified, and provably inert.
+
+**The action names both halves of the fix.** `chmod +x` alone does not survive a fresh clone;
+`git update-index --chmod=+x` is what makes the mode stick for everyone else. An action that fixes
+the reporter's machine and leaves the fleet broken is not a fix.
+
+**Known false positive, accepted:** someone may clear the execute bit deliberately, as a way to
+park a guard. The template documents deleting the companion as the way to stop it running, so this
+is not the sanctioned path — but people will do it, and for them this is a genuine trade-off to
+dismiss. That is what a ledger dismissal is for, and unlike the blind spot in decision 1, the
+dismissal would be honest.
+
 ## What this cost the design
 
-Nothing on the objective axis. No predicate was added, no lens, no configuration field, no new
-finding id — decision 1 removes a false finding, decision 2 removes a false refusal, decision 3
-removes a false instruction. All three are the tool learning to read what it already wrote.
+Nothing on the objective axis. No predicate was added, no lens, no configuration field. Decision 1
+removes a false finding, decision 2 a false refusal, decision 3 a false instruction; decision 4
+adds the one finding id in the set, for a condition the tool could already see and was merely
+declining to rank. All four are the tool learning to read what it already wrote.
 
 `PACK_VERSION` moves to 6: the generated files change meaning.

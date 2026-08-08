@@ -64,6 +64,36 @@ export function deriveGateFindings(inv: GateInventory, disclosures: string[] = [
     }
   }
 
+  // A companion the hook calls, that exists, and that provably cannot run. The repo believes it
+  // gates on those checks; the `[ -x ]` guard skips them on every commit or push, silently.
+  //
+  // `gap`, not `risk`, and the distinction is the tier vocabulary rather than caution: risk is
+  // reserved for what makes an agent do the wrong thing, which is why `hooks-not-wired` earns it
+  // — there EVERY gate is dead. One companion not running is a missing safeguard. (It also keeps
+  // an upgrade from failing the `--fail-on risk` gate this tool recommends, in a repo whose code
+  // did not change.)
+  //
+  // `kind: truth` because it is not an opinion: the file is called, it is there, and the mode bit
+  // says it will be skipped.
+  if (inv.local.inertCompanions?.length) {
+    const files = inv.local.inertCompanions
+    findings.push(
+      finding({
+        id: `${LENS_ID}/companion-not-executable`,
+        tier: "gap",
+        kind: "truth",
+        claim: `${files.join(", ")} ${files.length === 1 ? "is" : "are"} called by a hook but not executable — the checks inside never run`,
+        evidence: files,
+        why: "The hook guards the call with `[ -x ]`, so it skips the file in silence — the repo looks guarded and is not, on every clone that carries the same mode bit.",
+        // chmod alone does not survive a fresh clone: git tracks exactly one permission bit, so
+        // the fix has to reach the index or the dead gate propagates to everyone else.
+        action: `Run \`chmod +x ${files[0]}\` and commit the mode with \`git update-index --chmod=+x ${files[0]}\`.`,
+        effort: "S",
+        confidence: "high",
+      }),
+    )
+  }
+
   // Shift-left gaps: CI enforces a correctness tool no local hook runs — failures surface only
   // after push, one slow pipeline later.
   for (const tool of CORRECTNESS_TOOLS) {
@@ -202,11 +232,11 @@ export const gateIntegrityLens: Lens = {
         `Checks in ${inv.local.companions.join(", ")} are counted as locally enforced — the generated hook calls the companion, and etymd reads it without owning it.`,
       )
     }
-    // The opposite case, and a silent one: the call is there, the file is there, the execute bit
-    // is not — so the hook's `[ -x ]` test skips it on every push.
-    if (inv.local.inertCompanions.length) {
+    // Counted, but on a filesystem whose execute bit answers nothing — say so rather than let the
+    // enforcement claim look better verified than it is.
+    if (inv.local.unverifiedCompanions.length) {
       disclosures.push(
-        `${inv.local.inertCompanions.join(", ")} ${inv.local.inertCompanions.length === 1 ? "is" : "are"} called by a hook but not executable — the hook's \`[ -x ]\` test skips ${inv.local.inertCompanions.length === 1 ? "it" : "them"}, so any check inside is NOT counted as enforced. \`chmod +x\` makes it run.`,
+        `Checks in ${inv.local.unverifiedCompanions.join(", ")} are counted as locally enforced, but the execute bit could not be judged here (no POSIX mode bits, or the hook beside it is not executable either) — whether ${inv.local.unverifiedCompanions.length === 1 ? "it runs" : "they run"} was not verified.`,
       )
     }
     if (inv.ci.system === "none")

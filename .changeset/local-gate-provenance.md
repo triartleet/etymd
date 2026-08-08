@@ -46,6 +46,19 @@ replaces the bare `<!-- etymd pack vN -->` line, carrying the same version plus 
 `.etymd/config.json` is excluded — it holds the user's recorded decisions, is merged into rather
 than generated, and JSON has nowhere to hide a stamp.
 
+**New finding: a companion that cannot run.** `gate-integrity/companion-not-executable` reports a
+`<hook>.local` that a hook calls, that exists, and that provably lacks the execute bit — the check
+inside is skipped silently on every run, and git tracks exactly one permission bit, so the dead
+gate reaches every clone. Emitted at `gap` rather than `risk`: risk is reserved for what makes an
+agent do the wrong thing (`hooks-not-wired` earns it because every gate is dead there), and it
+also means an upgrade cannot fail the `--fail-on risk` gate in a repo whose code did not change.
+The action names both halves of the fix, since `chmod +x` alone does not survive a fresh clone.
+
+The accusation is guarded: "not executable" is trusted only where the hook beside it HAS the bit,
+which is what proves the bit means anything on that filesystem. Where it cannot be established the
+checks are counted and the uncertainty is disclosed, so a checkout without POSIX mode bits is
+never told its working gate is dead.
+
 **The fleet sweep stops recommending a command that would refuse.** `fleet` reported every
 differing gate under one finding whose action was "re-run `etymd gates`" — advice that does not
 work for a hand-edited hook. A provably-edited gate is now disclosed as a customisation rather

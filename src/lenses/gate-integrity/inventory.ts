@@ -46,7 +46,15 @@ export interface GateInventory {
     lintStaged: GateTool[]
     /** Companion files the hooks call and whose checks ARE counted above. */
     companions: string[]
-    /** Companions a hook calls that exist but lack the execute bit — the call skips them. */
+    /**
+     * Counted, but the execute bit could not be judged here — no POSIX mode bits, or a hook that
+     * is not itself executable, which means this filesystem's bits prove nothing either way.
+     */
+    unverifiedCompanions: string[]
+    /**
+     * Companions a hook calls that exist and provably lack the execute bit while the hook beside
+     * them has it. NOT counted: the call skips them on every run.
+     */
     inertCompanions: string[]
   }
   ci: {
@@ -402,6 +410,13 @@ function parseGithubWorkflow(
  * gets nothing attributed to it), and the companion must pass the same `[ -x ]` test the hook
  * applies before running it. A present-but-not-executable companion is silently skipped by the
  * hook, so its checks are NOT counted — it is reported as inert instead.
+ *
+ * "Not executable" is only trusted where the execute bit is demonstrably meaningful, which is
+ * what the HOOK's own bit establishes. A filesystem that carries no bits (a Windows checkout, a
+ * mount that drops them) reports everything as non-executable, and accusing there would invent a
+ * dead gate on a machine where the shell may well be running it. So the claim needs an asymmetry:
+ * the hook has the bit, the companion beside it does not. Where the answer is unknowable, the
+ * checks are counted and the uncertainty is disclosed — never converted into an accusation.
  */
 async function companionOf(
   root: string,
@@ -409,16 +424,22 @@ async function companionOf(
   hook: string,
   hookText: string,
   scripts: Record<string, string>,
-): Promise<{ rel: string; tools: GateTool[]; inert: boolean } | null> {
+): Promise<{ rel: string; tools: GateTool[]; state: "counted" | "unverified" | "inert" } | null> {
   const rel = path.posix.join(hooksDir.split(path.sep).join("/"), `${hook}.local`)
   if (!hookText.includes(`${hook}.local`)) return null
   const abs = path.join(root, hooksDir, `${hook}.local`)
   const text = await readText(abs)
   if (text === null) return null
-  // null = platform cannot answer (Windows): count it rather than invent a dead gate.
-  const executable = await isExecutable(abs)
-  if (executable === false) return { rel, tools: [], inert: true }
-  return { rel, tools: matchTools(text, scripts), inert: false }
+  const [executable, hookExecutable] = await Promise.all([
+    isExecutable(abs),
+    isExecutable(path.join(root, hooksDir, hook)),
+  ])
+  if (executable === false && hookExecutable === true) return { rel, tools: [], state: "inert" }
+  return {
+    rel,
+    tools: matchTools(text, scripts),
+    state: executable === true ? "counted" : "unverified",
+  }
 }
 
 async function localHookTools(
@@ -429,6 +450,7 @@ async function localHookTools(
   const hooks = facts.hooks
   const empty: GateTool[] = []
   const companions: string[] = []
+  const unverifiedCompanions: string[] = []
   const inertCompanions: string[] = []
   const readHook = async (name: string): Promise<GateTool[]> => {
     if (!hooks.dir) return empty
@@ -437,9 +459,9 @@ async function localHookTools(
     const tools = new Set<GateTool>(matchTools(text, scripts))
     const companion = await companionOf(root, hooks.dir, name, text, scripts)
     if (companion) {
-      if (companion.inert) inertCompanions.push(companion.rel)
+      if (companion.state === "inert") inertCompanions.push(companion.rel)
       else {
-        companions.push(companion.rel)
+        ;(companion.state === "counted" ? companions : unverifiedCompanions).push(companion.rel)
         for (const t of companion.tools) tools.add(t)
       }
     }
@@ -510,6 +532,7 @@ async function localHookTools(
     commitMsg,
     lintStaged,
     companions,
+    unverifiedCompanions,
     inertCompanions,
   }
 }
