@@ -152,6 +152,41 @@ describe("doc-ref extraction (home paths are not repo paths)", () => {
     const { refs } = extractDocRefs("State is tracked in PROJECT_CONTEXT.md.")
     expect(refs).toEqual(["PROJECT_CONTEXT.md"])
   })
+
+  it("a mention whose point is the doc's deliberate absence is not a dangling claim", () => {
+    // The observed defect: a repo that dropped its CLAUDE.md pointer and wrote down why stood
+    // accused of a dangling ref until it worded around the very filename its convention was
+    // about. Both absence shapes on one line — the "no X" prefix and create-this prose.
+    const { refs, absenceSkipped } = extractDocRefs(
+      "There is no `CLAUDE.md` here on purpose: creating a `CLAUDE.md` would reintroduce two-file drift.",
+    )
+    expect(refs).toEqual([])
+    expect(absenceSkipped).toBe(2)
+  })
+
+  it("an explicit absence statement alone also skips", () => {
+    const { refs, absenceSkipped } = extractDocRefs(
+      "`DECISIONS.md` does not exist in this repo — decisions are recorded upstream.",
+    )
+    expect(refs).toEqual([])
+    expect(absenceSkipped).toBe(1)
+  })
+
+  it("a true stale pointer still flags: the skip needs absence prose on the mention's line", () => {
+    const { refs, absenceSkipped } = extractDocRefs("See `CLAUDE.md` for details.")
+    expect(refs).toEqual(["CLAUDE.md"])
+    expect(absenceSkipped).toBe(0)
+  })
+
+  it("one plain mention on its own line still claims the doc beside an absence note", () => {
+    // Same line granularity as the path scanner: the context is the mention's line, so the
+    // absence prose must sit on the mention itself, not somewhere else in the file.
+    const { refs, absenceSkipped } = extractDocRefs(
+      "Creating a `CLAUDE.md` is forbidden.\n\nHistorically CLAUDE.md held the same rules.",
+    )
+    expect(refs).toEqual(["CLAUDE.md"])
+    expect(absenceSkipped).toBe(1)
+  })
 })
 
 describe("instruction-truth lens (the lying-AGENTS.md fixture)", () => {
@@ -231,6 +266,26 @@ describe("instruction-truth lens (the lying-AGENTS.md fixture)", () => {
     const report = await runTruth()
     expect(report.findings.filter((f) => f.id.includes("dangling-ref"))).toEqual([])
     expect(report.disclosures.some((d) => d.includes("`~/` home paths"))).toBe(true)
+  })
+
+  it("a deliberate-absence note is not a dangling ref; a plain pointer still is", async () => {
+    // The extensions case: naming the file your convention is ABOUT ("creating a CLAUDE.md
+    // would reintroduce drift") must not read as pointing agents at it. The skip is disclosed,
+    // and a genuine stale pointer in the same fixture still flags.
+    await write("package.json", JSON.stringify({ name: "absentdoc", private: true }))
+    await write(
+      "AGENTS.md",
+      "# AGENTS.md\n\nThere is no CLAUDE.md here: creating a `CLAUDE.md` would reintroduce two-file drift.\n",
+    )
+    const clean = await runTruth()
+    expect(clean.findings.filter((f) => f.id.includes("dangling-ref"))).toEqual([])
+    expect(clean.disclosures.some((d) => d.includes("deliberately does not exist"))).toBe(true)
+
+    await write("AGENTS.md", "# AGENTS.md\n\nSee `CLAUDE.md` for details.\n")
+    const flagged = await runTruth()
+    expect(flagged.findings.map((f) => f.id)).toContain(
+      "instruction-truth/dangling-ref:AGENTS.md:CLAUDE.md",
+    )
   })
 
   it("resolves workspace scripts and package-relative paths in a monorepo (no false lies)", async () => {

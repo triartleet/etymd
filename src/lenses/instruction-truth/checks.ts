@@ -96,6 +96,8 @@ export async function buildTruthEnv(root: string, facts: ProjectFacts): Promise<
 export interface ClaimCounters {
   filteredSkipped: number
   tildeSkipped: number
+  /** Doc mentions whose own line says the doc deliberately does not exist here — skipped, counted. */
+  absenceSkipped: number
   binaryResolved: number
   unverifiableCommands: number
   gitignoredSkipped: number
@@ -117,6 +119,7 @@ export function emptyCounters(): ClaimCounters {
   return {
     filteredSkipped: 0,
     tildeSkipped: 0,
+    absenceSkipped: 0,
     binaryResolved: 0,
     unverifiableCommands: 0,
     gitignoredSkipped: 0,
@@ -354,8 +357,9 @@ export async function checkDocRefs(
 ): Promise<RefsResult> {
   const findings: Finding[] = []
   const examined: ExaminedClaim[] = []
-  const { refs, tildeSkipped } = extractDocRefs(file.text)
+  const { refs, tildeSkipped, absenceSkipped } = extractDocRefs(file.text)
   counters.tildeSkipped += tildeSkipped
+  counters.absenceSkipped += absenceSkipped
   for (const ref of refs) {
     const exists = await pathExists(path.join(env.root, ref))
     examined.push({ kind: "doc", value: ref, exists })

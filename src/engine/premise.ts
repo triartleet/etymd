@@ -363,6 +363,11 @@ export async function runPremise(opts: PremiseOptions): Promise<PremiseResult> {
       `${counters.tildeSkipped} well-known doc mention(s) sit inside \`~/\` home paths (e.g. \`~/.claude/CLAUDE.md\`) — machine-global files, not this repo's; skipped, not flagged.`,
     )
   }
+  if (counters.absenceSkipped) {
+    disclosures.push(
+      `${counters.absenceSkipped} well-known doc mention(s) name the doc only to say it deliberately does not exist here (create-this or absence prose) — skipped, not flagged.`,
+    )
+  }
   if (counters.qualifiedRefsSkipped) {
     disclosures.push(
       `${counters.qualifiedRefsSkipped} decision reference(s) name another record — not this repo's; skipped.`,

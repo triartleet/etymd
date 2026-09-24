@@ -492,28 +492,58 @@ export interface DocRefs {
   refs: string[]
   /** Mentions embedded in `~/`-home paths — outside the repo, unverifiable from it. */
   tildeSkipped: number
+  /** Mentions whose own line says the doc deliberately does not exist here — skipped, counted. */
+  absenceSkipped: number
 }
+
+// A doc named only to say it deliberately does NOT exist here is not a stale pointer — the repo
+// is right to lack it. Observed: a repo that dropped its CLAUDE.md pointer and wrote down why
+// stood accused of a dangling ref until it worded around the very filename its convention was
+// about. The skip mirrors the classes the path scanner already honours — create-this prose
+// through the shared CREATION_CONTEXT_RE — plus an explicit absence statement. Narrow on
+// purpose: every phrase here must be an unambiguous "it is not meant to exist", because each
+// one widens the set of stale pointers that pass silently.
+const ABSENCE_CONTEXT_RE =
+  /\b(?:no\s+such\s+(?:file|doc(?:ument)?)|none\s+exists|does\s+not\s+exist|doesn'?t\s+exist|deliberately\s+absent|never\s+existed)\b/i
+// "no `CLAUDE.md` exists here" carries the negation directly before the mention, so the test
+// is against the same line's prefix, backticks and quotes allowed in between — a "no" elsewhere
+// on the line ("we saw no reason") must not reach it.
+const NO_DOC_PREFIX_RE = /\bno\s+(?:such\s+)?[\s`'"]*$/i
 
 /**
  * A bare substring match is not enough: `~/.claude/CLAUDE.md` mentions CLAUDE.md but points at
  * the reader's machine, never at the repo — treating it as a repo ref accused a true sentence of
  * lying (the home file existed; the repo never had one). A home-path occurrence is skipped and
  * counted like the absolute tokens below; one ordinary occurrence still makes the doc a claim.
+ * Deliberate-absence prose gets the same per-mention rule: one plain mention beside the
+ * explanation still claims the doc, so a true stale pointer ("see CLAUDE.md for details")
+ * flags exactly as before.
  */
 export function extractDocRefs(text: string): DocRefs {
   const refs: string[] = []
   let tildeSkipped = 0
+  let absenceSkipped = 0
   for (const name of KNOWN_DOC_REFS) {
     let claimed = false
     let at = text.indexOf(name)
     while (at !== -1) {
       let head = at
       while (head > 0 && PATH_TOKEN_CHARS.test(text[head - 1] as string)) head -= 1
-      if (text[head] === "~") tildeSkipped += 1
-      else claimed = true
+      if (text[head] === "~") {
+        tildeSkipped += 1
+      } else {
+        const lineStart = text.lastIndexOf("\n", at) + 1
+        const context = claimContext(text, head)
+        const deliberate =
+          NO_DOC_PREFIX_RE.test(text.slice(lineStart, head)) ||
+          CREATION_CONTEXT_RE.test(context) ||
+          ABSENCE_CONTEXT_RE.test(context)
+        if (deliberate) absenceSkipped += 1
+        else claimed = true
+      }
       at = text.indexOf(name, at + name.length)
     }
     if (claimed) refs.push(name)
   }
-  return { refs, tildeSkipped }
+  return { refs, tildeSkipped, absenceSkipped }
 }

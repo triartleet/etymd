@@ -253,6 +253,11 @@ export const instructionTruthLens: Lens = {
         `${counters.tildeSkipped} well-known doc mention(s) sit inside \`~/\` home paths (e.g. \`~/.claude/CLAUDE.md\`) — machine-global files, not this repo's; skipped, not flagged.`,
       )
     }
+    if (counters.absenceSkipped) {
+      disclosures.push(
+        `${counters.absenceSkipped} well-known doc mention(s) name the doc only to say it deliberately does not exist here (create-this or absence prose) — skipped, not flagged.`,
+      )
+    }
     if (stateDocs.length) {
       disclosures.push(
         `Checked ${stateDocs.length} state document(s) for command, path, and decision-reference claims (same skip classes as instruction files); decision ids resolved against ${
