@@ -106,7 +106,7 @@ describe("expandScriptRefs / matchTools", () => {
   })
 })
 
-// The cra-legacy shape: a sonar job with NO local script (it lives
+// The legacy Create React App shape: a sonar job with NO local script (it lives
 // in an org template) but SONAR_* variables + allow_failure; husky-v3 + lint-staged
 // prettier-only locally; coverage collected but no threshold; commitlint installed but unwired;
 // an org include the tool cannot read; !reference tags that must not break parsing.
@@ -148,7 +148,7 @@ async function writeLegacySpaFixture() {
   await write(
     "package.json",
     JSON.stringify({
-      name: "cra-legacy-like",
+      name: "legacy-cra-like",
       scripts: {
         test: "yarn test:lint && yarn test:format && yarn test:types && yarn test:unit",
         "test:lint": "eslint . --ext .ts,.tsx",
@@ -167,7 +167,7 @@ async function writeLegacySpaFixture() {
   await write(".gitlab-ci.yml", LEGACY_SPA_CI)
 }
 
-describe("buildGateInventory (cra-legacy-shaped fixture)", () => {
+describe("buildGateInventory (legacy CRA-shaped fixture)", () => {
   it("parses CI with !reference tags, records inherited includes and advisory jobs", async () => {
     await writeLegacySpaFixture()
     const facts = await scanProject(dir)

@@ -122,7 +122,7 @@ describe("scanProject", () => {
 })
 
 describe("classifyCommands — corpus-shaped script sets", () => {
-  it("nx-monorepo shape: bare meta `test` must not shadow test:unit:local; test:format is the check", () => {
+  it("Nx monorepo shape: bare meta `test` must not shadow test:unit:local; test:format is the check", () => {
     const cmds = classifyCommands({
       test: "npm-run-all test:lint:local test:types:local test:unit:local",
       "test:lint:local": "nx affected --target=lint",
@@ -139,7 +139,7 @@ describe("classifyCommands — corpus-shaped script sets", () => {
     expect(cmds.formatCheck).not.toBe("format")
   })
 
-  it("spa-bff shape: test:unit wins over the && meta test; test:no-jest stays visible in raw", () => {
+  it("SPA with a server shape: test:unit wins over the && meta test; test:no-jest stays visible in raw", () => {
     const cmds = classifyCommands({
       test: "yarn test:unit && yarn test:no-jest",
       "test:unit": "jest",
@@ -155,7 +155,7 @@ describe("classifyCommands — corpus-shaped script sets", () => {
     expect(cmds.raw["test:no-jest"]).toBeDefined()
   })
 
-  it("cra-legacy shape: prettier -l value classifies as formatCheck; format:eslint (--fix) is not lint", () => {
+  it("legacy CRA shape: prettier -l value classifies as formatCheck; format:eslint (--fix) is not lint", () => {
     const cmds = classifyCommands({
       test: "yarn test:lint && yarn test:format && yarn test:types && yarn test:unit",
       "test:lint": "eslint . --ext .ts,.tsx",

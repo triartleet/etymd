@@ -36,7 +36,7 @@ is a gap by the tool's own definition, and consistency matters more than emphasi
 
 ## Precision holds at two new edges
 
-**Foreign records.** Prose legitimately cites OTHER ledgers ("fleet D-050", "upstream D-014").
+**Foreign records.** Prose legitimately cites OTHER ledgers ("peer D-050", "upstream D-014").
 A reference immediately preceded by a word that is not connective prose or a citation verb is
 treated as naming another record — skipped and disclosed, never accused. The skip errs safe: an
 unlisted verb costs a check, never a false "your file is lying".

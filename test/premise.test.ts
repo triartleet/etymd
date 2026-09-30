@@ -41,7 +41,7 @@ async function fixture() {
 /** The shape the false positives came from: `bootstrap/` and `docs/` exist, no `src/`. */
 async function noSrcFixture() {
   await write("package.json", JSON.stringify({ name: "nosrc", private: true }))
-  await write("bootstrap/queue-entry.sh", "#!/bin/sh\n")
+  await write("bootstrap/setup.sh", "#!/bin/sh\n")
   await write("docs/fleet.md", "# Fleet\n")
 }
 

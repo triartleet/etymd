@@ -94,13 +94,13 @@ describe("content screen", () => {
 describe("allow-file records", () => {
   it("reads a labeled record: the pattern is the rest of its line, verbatim", () => {
     const { lines: entries } = compileAllow(
-      ["pattern ^AcmeInc$", "reason fixture text", "date 2026-08-15", "author nightly"].join("\n"),
+      ["pattern ^AcmeInc$", "reason fixture text", "date 2026-08-15", "author maintainer"].join("\n"),
     )
     expect(entries).toHaveLength(1)
     expect(entries[0]?.pattern.source).toBe("^AcmeInc$")
     expect(entries[0]?.reason).toBe("fixture text")
     expect(entries[0]?.date).toBe("2026-08-15")
-    expect(entries[0]?.author).toBe("nightly")
+    expect(entries[0]?.author).toBe("maintainer")
   })
 
   it("PINNED: a pattern may contain pipes — alternation survives intact", () => {
@@ -108,7 +108,7 @@ describe("allow-file records", () => {
     // first branch and the rest could masquerade as provenance — a silent narrowing of the
     // gate. Labeled lines cannot express that misparse: the pattern runs to end of line.
     const { lines: entries } = compileAllow(
-      ["pattern AcmeInc|BetaInc", "reason either name", "date 2026-08-15", "author nightly"].join(
+      ["pattern AcmeInc|BetaInc", "reason either name", "date 2026-08-15", "author maintainer"].join(
         "\n",
       ),
     )
