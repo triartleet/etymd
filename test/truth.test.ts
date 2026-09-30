@@ -79,7 +79,7 @@ describe("claim extraction", () => {
     expect(paths.sort()).toEqual(["docs/design", "src/core/detect.ts"])
   })
 
-  it("treats create-this paths as prospective, not claims (the oss-fork skill class)", () => {
+  it("treats create-this paths as prospective, not claims (the forked-repo skill class)", () => {
     const { paths, prospective } = extractPathClaims(
       [
         "Create `migrations/quarantine/` before starting the move.",
@@ -248,7 +248,7 @@ describe("instruction-truth lens (the lying-AGENTS.md fixture)", () => {
     )
     const report = await runTruth()
     // Both claims resolve in the workspace — flagging them would be the false-positive class
-    // the workspace-fullstack live run exposed.
+    // a live run on a pnpm workspace exposed.
     expect(report.findings).toEqual([])
   })
 

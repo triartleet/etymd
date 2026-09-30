@@ -7,18 +7,14 @@ does not ship. Decision record: [`docs/decisions/003-truth-guard-pivot.md`](docs
 
 ## Now (prove it in daily use)
 
-- **Daily-driver validation on the corpus.** Run `etymd audit` routinely on the sibling repos
-  (the workspace-fullstack corpus as the clean control; cra-legacy/spa-bff as the findings-rich cases); fix every false positive at
-  the heuristic level. Model passes so far: workspace-fullstack 24→0 (command-position matching,
-  extensionless-token=prose, workspace-relative resolution); the `yarn nx` class (nx-monorepo 1→0) —
-  a command that resolves to an installed `node_modules/.bin` binary is true, not a stale script,
-  and is unverifiable (skipped + disclosed) when `node_modules` is absent; and the workspace-fullstack-main
-  pass (4→2, 2026-07-25): dotted hook-notation prose like `create/update.after` needs a
-  _recognized_ extension to be a file claim, and a missing-but-gitignored claim (a gitignored env file)
-  is machine-local — unverifiable, skipped + disclosed. Current corpus baseline: workspace-fullstack 2
-  (context-economy, real), cra-legacy 4, spa-bff 5 (3 real stale-path), nx-monorepo 0. **First external gate is
-  live:** the workspace-fullstack corpus repo’s pre-push hook runs `etymd audit --fail-on risk` via the sibling checkout
-  — the CI half follows once etymd has a remote.
+- **Daily-driver validation.** Run `etymd audit` routinely on real repositories of different
+  shapes and fix every false positive at the heuristic level, never by suppressing a finding.
+  Classes fixed this way so far: command-position matching, extensionless tokens read as prose,
+  workspace-relative resolution, commands that resolve to an installed `node_modules/.bin`
+  binary (unverifiable, skipped and disclosed when `node_modules` is absent), dotted
+  hook-notation prose like `create/update.after` (a file claim needs a _recognized_ extension),
+  and missing-but-gitignored claims (machine-local: unverifiable, skipped and disclosed). A
+  pre-push hook running `etymd audit --fail-on risk` is the first external gate in daily use.
 
 ### Shipped since 003
 
@@ -43,30 +39,22 @@ does not ship. Decision record: [`docs/decisions/003-truth-guard-pivot.md`](docs
   manifest, and the fleet-scope wall findings. Registry + fleet `--json` schemas are
   experimental through 0.2.x.
 
-- **Scoped audits + two new skip classes** (2026-07-28), both harvested from the oss-fork first
-  audit and both proven on it:
+- **Scoped audits + two new skip classes** (2026-07-28):
 
   - **`.etymd/config.json`** (committed, every key optional) — `instructions.include` /
     `instructions.exclude` globs and `context.perFileWords` / `context.totalWords` budgets, which
-    were code constants until now. A file rather than a package.json key, because the corpus holds
-    a repo with no manifest and a fork that must not touch upstream's. The honesty rule is
+    were code constants until now. A file rather than a package.json key, because a repo may have
+    no manifest, and a fork must not touch upstream's files. The honesty rule is
     structural: excluded files are counted and **named** in the disclosures, and malformed config
     is disclosed rather than silently defaulted — scoping must never buy a quietly clean report.
   - **Create-this and stand-in path claims** — a path the surrounding prose instructs _creating_
     (migration quarantine dirs, generated output) is forward-looking, not stale; a naming
     stand-in (`my-custom-skill`, `your-*`) was never a claim. One plain reference anywhere in the
     file still makes a path a live claim, so a stale path cannot hide behind a single mention.
-  - **oss-fork result** — 56 → 51 findings from the skip classes alone, then 51 → 3 once the
-    upstream skills directory is excluded: instruction-truth drops to **zero**, the fork's own
-    layer (CLAUDE.md, plus its design docs pulled in by an include glob) is clean, and the 3 that
-    remain are the deliberate CI-only gate gaps. The rest of the corpus is unmoved (workspace-fullstack 2,
-    nx-monorepo 0, spa-bff 5, cra-legacy 4, vscode-extension 0, docs-only 0), so no real finding was skipped away.
 
-- **Corpus grown to 7** (2026-07-26): vscode-extension (first etymd-scaffolded contract in daily
-  use), docs-only (docs-only, no manifest), oss-fork (large fork with a claim-rich inherited
-  instruction layer — onboarding pending). First `init` dogfood immediately caught two classes, both
-  fixed at the source: the scaffold's frameworks fallback claimed `see package.json` in repos
-  that have none (pack v2), and husky v9's `.husky/_` hooksPath misread as a custom hook setup.
+- **First `init` dogfood** (2026-07-26) immediately caught two classes, both fixed at the source:
+  the scaffold's frameworks fallback claimed `see package.json` in repos that have none (pack
+  v2), and husky v9's `.husky/_` hooksPath misread as a custom hook setup.
 
 - **Ledger management commands** — `etymd dismiss <id> --reason "…"` (false positive, reason
   required), `etymd accept <id>` (known trade-off), `etymd ledger` (list by status). Both dismiss
@@ -84,25 +72,11 @@ does not ship. Decision record: [`docs/decisions/003-truth-guard-pivot.md`](docs
 - **Config file, remaining surface**: path-heuristic ignore rules and per-finding suppressions as
   an alternative to ledger dismissal. Scope globs and context budgets shipped 2026-07-28; these
   two were the parts of the original idea nothing has yet demanded.
-- **Corpus follow-ups, next sessions:**
-  - **oss-fork** — the fix is proven but NOT yet committed to the fork: writing
-    `.etymd/config.json` with `exclude: [".claude/skills/**"]` (+ `include: ["design/**/*.md"]`)
-    is the owner's call, as is whether any skill under `.claude/skills/` is fork-owned and should
-    stay in scope. The remaining 3 CI-only-gate gaps are deliberate hooks divergence from
-    upstream.
-  - **docs-only** — the contract deliberately says "do not start building"; as design sessions
-    produce the decision record and the stack lands, the AGENTS.md fills in and `etymd audit`
-    tracks each claim as it becomes checkable. First re-approve will restamp pack v1 → v2.
-  - **vscode-extension** — first push exercises the new pre-push gate live; when the repo gets CI,
-    gate it on `etymd audit --fail-on risk` (the second external gate after the workspace-fullstack corpus). Also
-    restamps to pack v2 on next approve.
 - **Baseline-aware CI recipe hardening**: document the two-job pattern (audit `--fail-on risk` on
   MRs; scheduled full audit that comments the ledger diff).
 - **Context-economy deepening**: measure the delta an extraction actually buys (before/after
   words/tokens per session), so the lens's advice carries a number. Budgets are now per-repo
   configurable, so the next question is what a _right_ budget is, not where it lives.
-- **AI-review gate harvest**: distill the corpus's two advisory AI-review CI jobs into a
-  `gates --ci` generator.
 
 ## Later (only if the objective still leads)
 
@@ -118,9 +92,7 @@ does not ship. Decision record: [`docs/decisions/003-truth-guard-pivot.md`](docs
   always-loaded context measurement names `PROJECT_CONTEXT.md` literally, so a registry
   `contract.state` override (e.g. `STATUS.md`) is freshness-checked but does not yet join
   `measureContext` — join it by artifact kind in slice 3.
-- Loop metrics ingest (workspace-fullstack's `scripts/loop-metrics.mjs` output) — measurement of the loop the
-  instructions serve.
-- Watch-mode / git-hook integration (`etymd audit --truth` as a pre-push step in guarded repos).
+- Watch-mode / git-hook integration (`etymd audit --truth` as a pre-push step).
 - More instruction dialects as they standardize (new agent config locations).
 - Editor surfacing (problems-panel via `--json`) — but LSP/autofix stay agnix's lane; re-evaluate
   before ever entering it.

@@ -1115,7 +1115,7 @@ describe.skipIf(!existsSync(CLI))("fleet CLI wiring (built binary)", () => {
   it("writes a complete entry and preserves the hand-maintained document around it", async () => {
     await initRepo("newproj")
     const manifestPath = await writeHub([])
-    // Prose keys the owner maintains by hand must survive the append.
+    // Prose keys the user maintains by hand must survive the append.
     const before = JSON.parse(await fs.readFile(manifestPath, "utf8")) as Record<string, unknown>
     before._readme = "hand-written prose"
     await fs.writeFile(manifestPath, JSON.stringify(before, null, 2) + "\n")

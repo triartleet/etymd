@@ -30,7 +30,6 @@ function publishGateKey(route: ProjectFacts["publishRoute"]): string {
 
 export interface GatesOptions {
   cwd: string
-  ci?: boolean
   yes?: boolean
 }
 
@@ -199,13 +198,6 @@ async function writeGateConfig(root: string, gates: GateConfig): Promise<void> {
 
 export async function run(opts: GatesOptions): Promise<void> {
   const facts = await scanProject(opts.cwd)
-
-  if (opts.ci) {
-    section("CI review gate")
-    print(
-      `  ${glyph.partial} ${theme.dim("The advisory AI-review CI job (bring-your-own-key) ships in a later release — installing the free local gates below.")}`,
-    )
-  }
 
   if (!facts.git.isRepo) {
     print(

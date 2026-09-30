@@ -6,7 +6,7 @@ name, **clothaid**). Where they disagree with this document, this one wins._
 ## Why
 
 Before investing further, the project ran a state-of-the-field investigation (July 2026) to find
-a genuine, enduring, under-served gap — with a hard constraint from the owner: one clear main
+a genuine, enduring, under-served gap — with a hard constraint from the author: one clear main
 objective, small scope, and only an adjustment of the existing core (a ground-up redesign would
 have ended the initiative).
 
@@ -85,7 +85,7 @@ an OSS tool lives in; npm-available; verified free of PATH/binary conflicts.
 
 Framework-staleness patterns (agents-lint's lane), LSP/editor integration + autofix (agnix's
 lane), configurable budgets/rules files, loop metrics, harvest, dashboard. Publish to npm remains
-**held** by the owner until the tool has proven itself in daily use on the corpus.
+**held** by the author until the tool has proven itself in daily use on the corpus.
 
 ## Sources (investigation)
 

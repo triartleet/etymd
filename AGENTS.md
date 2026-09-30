@@ -18,8 +18,7 @@ agent instructions true** — an instruction being anything told to an agent, in
 prompt (decision 010). It verifies the agent context layer (AGENTS.md, Claude Code instruction files, rules,
 skills) and, on request, the task an agent is handed, against the actual repo — command claims, path claims, consistency, CI↔local gate parity,
 context economy — with drift measured against a committed baseline and a regression ledger.
-Distilled from a frontrunner project workflow, validated against a sibling-repo corpus
-(`sources.json`). Solo developer; published on npm as `etymd`.
+Validated against real repositories of several shapes. Solo developer; published on npm as `etymd`.
 
 ## Stack
 
@@ -27,7 +26,7 @@ Distilled from a frontrunner project workflow, validated against a sibling-repo 
   CLI), Node ≥ 18.17, TypeScript strict, ESM-only.
 - **Build:** tsup — two builds: `src/cli.ts` (binary, shebang, per-command code-splitting) and
   `src/index.ts` (programmatic surface, dts). Runtime deps external + exact-pinned.
-- **Tests:** vitest (`test/`), including read-only smoke tests over the sibling corpus repos.
+- **Tests:** vitest (`test/`).
 - **CI:** GitHub Actions — `.github/workflows/ci.yml` and `.github/workflows/checks.yml`, on every
   push to main and every pull request.
 
@@ -99,8 +98,7 @@ over repo-wide scans.
   `gate-integrity/` (inventory + lens) · `context-economy.ts`
 - `src/pack/` — the versioned pack: `templates.ts` (minimal scaffold + hooks) · `version.ts`
 - `src/ui/` — render + theme (all terminal output goes through here)
-- `test/` — vitest suites incl. `truth.test.ts` (the lying-fixture) and `corpus.test.ts`
-  (read-only sibling-repo smokes)
+- `test/` — vitest suites incl. `truth.test.ts` (the lying-fixture)
 - `docs/decisions/` — the decision record (001 founding · 002 foundation re-lock · 003 truth-guard
   pivot — the current identity · 004 fleet mode · 005 declared rules, design only · 006 local gate
   provenance · 007 declared entry fields · 008 derived gate tier · 009 state-doc truth · 010
@@ -187,7 +185,7 @@ A change is done when these are green:
 
 ```bash
 npm run build        # tsup (cli + index)
-npm test             # vitest run (incl. corpus smokes; they skip if siblings absent)
+npm test             # vitest run
 npm run typecheck    # tsc --noEmit
 npm run format       # prettier --write
 node dist/cli.js …   # run the built CLI
@@ -199,4 +197,4 @@ node dist/cli.js …   # run the built CLI
    changes; 001/002 are the historical record (under the former name, clothaid).
 2. Work in small vertical slices; keep this map and the decision record current in the same change —
    `etymd audit` on this repo will flag what you forget.
-3. At session end, summarise what changed and what's next for the owner.
+3. At the end of a change, summarise what changed and what comes next.

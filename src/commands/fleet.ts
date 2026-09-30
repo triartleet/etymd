@@ -463,7 +463,7 @@ export async function add(opts: FleetAddCmdOptions): Promise<void> {
   }
 
   // `kind` is deliberately a FREE string, not a vocabulary: a fleet's categories are its own,
-  // and constraining them would make a general tool impose one owner's taxonomy. The scan can
+  // and constraining them would make a general tool impose one user's taxonomy. The scan can
   // only tell tool-shaped from repo-shaped, so that guess seeds the prompt and the kinds
   // already used in this manifest are offered beside it — the fleet's vocabulary reinforces
   // itself without ever being hardcoded.
@@ -562,7 +562,7 @@ export async function add(opts: FleetAddCmdOptions): Promise<void> {
           trust,
           // A milestones file present at registration is registered as the project's plan
           // surface; absent, the board shows the project as "not declared" until one lands —
-          // never a silent default to `none`, which is a decision only the owner takes.
+          // never a silent default to `none`, which is a decision only the user takes.
           contract: (await pathExists(path.join(absTarget, MILESTONES_FILE)))
             ? { milestones: MILESTONES_FILE }
             : {},

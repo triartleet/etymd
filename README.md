@@ -612,24 +612,11 @@ const audit = await runAudit(process.cwd(), { persistLedger: false })
 console.log(audit.findings) // one schema: claim · evidence · why · action · effort · confidence
 ```
 
-## The corpus (how this is validated)
+## How this is validated
 
-Etymd is developed against a corpus of real sibling repos rather than fixtures alone —
-[`sources.json`](https://github.com/fleetorders/etymd/blob/main/sources.json) lists them by shape. Every heuristic here exists because a real
-repo proved the previous one wrong, and each skip class in the truth lens is a false positive that
-a corpus run caught.
-
-Some corpus entries are private and are named by shape (`nx-monorepo`, `spa-bff`, `cra-legacy`)
-rather than by directory. To run those smokes locally, add an untracked `sources.local.json`
-mapping each name to its sibling directory:
-
-```json
-{ "dirs": { "nx-monorepo": "my-monorepo-checkout" } }
-```
-
-Each value is resolved as a sibling of the Etymd checkout.
-
-Without it — on a fresh clone or in CI — those suites skip cleanly and the rest still run.
+Every heuristic here exists because a real repository proved the previous one wrong, and each skip
+class in the truth lens is a false positive found that way. The fixtures in `test/` reproduce each
+case, so the suite runs the same checks on a fresh clone.
 
 ## Decision record & roadmap
 

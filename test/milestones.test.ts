@@ -121,12 +121,12 @@ describe("renderBoard — one page, every state named", () => {
       generatedOn: "2026-09-04",
       manifest: "registry.json",
       initiatives: parseInitiatives(
-        `| ${INITIATIVE_COLUMNS.join(" | ")} |\n|${INITIATIVE_COLUMNS.map(() => "---").join("|")}|\n| 1 | I1 | The steward | 2 | active | board first | L | hive | — |\n`,
+        `| ${INITIATIVE_COLUMNS.join(" | ")} |\n|${INITIATIVE_COLUMNS.map(() => "---").join("|")}|\n| 1 | I1 | The scheduler | 2 | active | board first | L | core | — |\n`,
       ).rows,
       initiativesProblems: [],
       projects: [
         {
-          name: "hive",
+          name: "core",
           kind: "tool",
           file: "MILESTONES.md",
           state: "ok",
@@ -147,8 +147,8 @@ describe("renderBoard — one page, every state named", () => {
       ],
     })
     expect(md).toContain("# Fleet board")
-    expect(md).toContain("| 1 | I1 | The steward | 2 | active | board first | L | hive | — |")
-    expect(md).toContain("### hive (tool) — planned 1 · active 1 · blocked 0 · done 0")
+    expect(md).toContain("| 1 | I1 | The scheduler | 2 | active | board first | L | core | — |")
+    expect(md).toContain("### core (tool) — planned 1 · active 1 · blocked 0 · done 0")
     expect(md).toContain(
       "| M2 | Rank drives the drain | 2 | planned | read the rank in the drain | L | M1 |",
     )

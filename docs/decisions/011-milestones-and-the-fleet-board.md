@@ -9,7 +9,7 @@ _Status: implemented._
 A fleet manifest (004) says what exists and where. It says nothing about where each project is
 going. Every hosted agent product that offers a "plan" surface keeps it in its own database;
 none reads a plan a repository already carries. A fleet's owner then holds the plan in their
-head, opens whichever project they fancy, and no scheduler, drain or steward can rank work
+head, opens whichever project they fancy, and no scheduler or automated runner can rank work
 because nothing machine-readable says what matters.
 
 The fix is not a planning product. It is one more contract file with a fixed shape, and one

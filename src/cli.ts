@@ -418,12 +418,11 @@ program
 program
   .command("gates")
   .description("Install the local git-hook gates (process → pre-commit, correctness → pre-push)")
-  .option("--ci", "note about the CI review gate (ships later; local gates install now)")
   .option("-y, --yes", "skip prompts; never overwrites a hand-edited hook")
   .action((opts, cmd) =>
     action(async () => {
       const { run } = await import("./commands/gates.js")
-      await run({ cwd: resolveCwd(cmd), ci: opts.ci, yes: opts.yes })
+      await run({ cwd: resolveCwd(cmd), yes: opts.yes })
     }),
   )
 

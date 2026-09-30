@@ -236,8 +236,8 @@ export const KNOWN_EXTENSIONS = new Set([
 ])
 
 // A path the surrounding prose tells the agent to CREATE is not a stale reference — it is a
-// forward-looking instruction, and the repo is right to lack it. Harvested from the oss-fork
-// first audit (migration quarantine dirs, generated outputs), the second new skip class after
+// forward-looking instruction, and the repo is right to lack it. Seen in real audits
+// (migration quarantine dirs, generated outputs), the second new skip class after
 // Better-Auth dotted notation.
 const CREATION_CONTEXT_RE =
   /\b(?:creat(?:e|es|ed|ing)|generat(?:e|es|ed|ing)|scaffold(?:s|ed|ing)?|quarantin(?:e|es|ed|ing)|(?:writ(?:e|es|ten|ing)|output(?:s|ted)?|emit(?:s|ted|ting)?|sav(?:e|es|ed|ing)|mov(?:e|es|ed|ing)|copy|copi(?:es|ed))\s+(?:it\s+|them\s+)?(?:to|into)|new\s+(?:file|directory|folder)|will\s+(?:be\s+)?(?:created|generated|written)|add(?:s|ed|ing)?\s+(?:a|the)\s+new)\b/i

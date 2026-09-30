@@ -8,7 +8,7 @@ coverage/
 .env.*
 !.env.example
 .etymd/cache/
-# Local-only map from a private corpus entry's public name to its sibling directory.
+# Local-only map from a legacy corpus manifest entry's name to its directory.
 sources.local.json
 # Fleet sweep delta baselines are local-only (the README tells manifest repos the same).
 *.fleet.json

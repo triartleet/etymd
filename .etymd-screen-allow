@@ -9,95 +9,91 @@
 pattern MACHINE_PATH_GREP
 reason detection pattern name and fixture
 date 2026-08-15
-author nightly
+author maintainer
 pattern absolute /Users/ paths\?
 reason fixture text proving machine-path detector fires
 date 2026-08-15
-author nightly
+author maintainer
 pattern contains an absolute
 reason fixture text proving machine-path detector fires
 date 2026-08-15
-author nightly
+author maintainer
 pattern tracked `/Users/` paths
 reason finding message text describing machine-path leaks
 date 2026-08-15
-author nightly
+author maintainer
 pattern `/Users/` paths in the manifest
 reason finding message text describing machine-path leaks
 date 2026-08-15
-author nightly
+author maintainer
 pattern A guarded email in a personal repo
 reason finding message text describing guarded leaks
 date 2026-08-15
-author nightly
+author maintainer
 pattern the machine's global git identity is usually
 reason finding prose explaining context
 date 2026-08-15
-author nightly
+author maintainer
 
 # Public API filenames a user is told to create (fleet management)
 pattern registry\.local\.json
 reason documented fleet-management filename
 date 2026-08-15
-author nightly
+author maintainer
 pattern sources\.local\.json
 reason documented fleet-management filename
 date 2026-08-15
-author nightly
+author maintainer
 
-# Ordinary English that collides with a project name, and the tool describing its own check
-pattern North-star framing
-reason project name collision in docs
-date 2026-08-15
-author nightly
+# The tool describing its own check
 pattern `/Users/` paths in the tracked file
 reason finding text describing the check
 date 2026-08-15
-author nightly
+author maintainer
 pattern rule text .`/Users/
 reason finding text describing the check
 date 2026-08-15
-author nightly
+author maintainer
 pattern bare "/Users/"
 reason finding text describing the check
 date 2026-08-15
-author nightly
+author maintainer
 pattern /Users/ that keeps going
 reason finding text describing the check
 date 2026-08-15
-author nightly
+author maintainer
 
 # Synthetic fixtures proving the machine-path detector fires
 pattern /Users/someone
 reason test fixture for machine-path detector
 date 2026-08-15
-author nightly
+author maintainer
 pattern /Users/\.\*/projects
 reason test fixture with regex pattern
 date 2026-08-15
-author nightly
+author maintainer
 
 # The detector's own tests
 pattern /Users/<anyone>
 reason test fixture name
 date 2026-08-15
-author nightly
+author maintainer
 pattern Absolute .`/Users/…. paths are banned
 reason test fixture proving ban text
 date 2026-08-15
-author nightly
+author maintainer
 pattern prose ABOUT the ban
 reason test fixture name
 date 2026-08-15
-author nightly
+author maintainer
 pattern paths are banned in tracked files
 reason test fixture text
 date 2026-08-15
-author nightly
+author maintainer
 
 # The vocabulary-class fixture for the generated-data exemption — its tests and docs must
 # name a credential-shaped English word, and this is the canonical one (period prose).
 pattern passkey
 reason vocabulary-class fixture for the generated-data path exemption
 date 2026-09-04
-author nightly
+author maintainer

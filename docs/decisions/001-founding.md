@@ -1,6 +1,6 @@
 # Design: clothaid — an agent-agnostic agentic-workflow CLI
 
-> Founding design document (v0.0.1). Distilled from a mature frontrunner project's workflow plus
+> Founding design document (v0.0.1). Distilled from a mature reference project's workflow plus
 > lessons from a corpus of other real repos spanning several shapes. Tool name
 > **`clothaid`** (npm-available).
 > "Reckon" is kept only as the name of the _scan step / knowledge-index artifact_; the binary is
@@ -8,7 +8,7 @@
 
 ## Context — why we're building this
 
-workspace-fullstack (the frontrunner project) has, over many sessions, converged a **locked agentic
+The reference project (a full-stack pnpm workspace) has, over many sessions, converged a **locked agentic
 workflow**: an operating contract (`AGENTS.md`), ground-truth state (`PROJECT_CONTEXT.md`), a
 navigation map (now a `repo-map` skill), composition-point seams, a session-archive protocol,
 structure/navigation rules, a three-tier gate model (process→pre-commit ·
@@ -20,12 +20,12 @@ the cost: every port is manual, and nothing keeps a port true after it lands.
 There is concrete demand for exactly this as a **portable kit — a setup CLI** — with **measured**
 delivery gains, which is what makes it worth building rather than re-porting.
 
-Today that port is manual: the owner links documents into a session and asks an agent to copy the
+Today that port is manual: the author links documents into a session and asks an agent to copy the
 setup. The need: **a CLI that reckons any project and installs/optimises this workflow for it,
 agent-agnostic, and keeps adding value + growing its own knowledge from the source projects.**
 
 **Framing (leverage lens).** The single biggest lever this tool can pull is
-**context economy on a measured loop**: workspace-fullstack proved context is ~85% of loop spend and that
+**context economy on a measured loop**: the reference project proved context is ~85% of loop spend and that
 extracting the map into a skill cut always-loaded context −52% _forever_. A generic scaffolder
 installs files; clothaid installs a **measured, self-auditing, context-lean discipline** and
 proves the gain in numbers. That is the differentiator to protect through every decision.
@@ -43,24 +43,24 @@ knowledge harvest, and gates.
 ## 2. Repo & corpus (decided)
 
 - **New repo**: a sibling checkout of its own (own release cadence; must not couple an
-  agent-agnostic product to workspace-fullstack's history).
-- **Sibling-path corpus**: a `sources.json` manifest pointing at local siblings — the workspace-fullstack
-  frontrunner plus the other corpus repos. No vendoring/submodules; works today because the
+  agent-agnostic product to the reference project's history).
+- **Sibling-path corpus**: a `sources.json` manifest pointing at local siblings — the reference
+  project plus the other corpus repos. No vendoring/submodules; works today because the
   corpus repos are local checkouts.
-- **Dogfooding validation loop** (core to development): regenerate workspace-fullstack's real artifacts from
+- **Dogfooding validation loop** (core to development): regenerate the reference project's real artifacts from
   clothaid and **diff against the hand-built originals** — the tool is "correct" when it can
-  reproduce the frontrunner's locked setup. Each corpus repo also validates a _different shape_:
+  reproduce the reference project's locked setup. Each corpus repo also validates a _different shape_:
   package topology, framework, command set, and hook setup all differ across them.
 
 ## 3. Core architecture — four building blocks
 
 ### 3a. The Knowledge Pack (versioned standard)
 
-The distilled, **versioned** encoding of the workspace-fullstack-derived standard: contract templates, the
+The distilled, **versioned** encoding of the reference-project-derived standard: contract templates, the
 R-rules, the gate-tier model, skill templates (repo-map, failure-modes, freshness-audit, session
 protocol), the canvas format, comment discipline, and the maturity rubric. **This is the tool's
 brain**, and the thing `harvest` (§6c) grows. Versioned so a project records _which_ pack version
-it was set up against (drift is then computable). Ships a default "workspace-fullstack-standard" pack;
+it was set up against (drift is then computable). Ships a default "reference-standard" pack;
 `org profiles` (§6h) layer on top.
 
 ### 3b. The Reckoning (per-project knowledge index)
@@ -157,7 +157,7 @@ Each is a standalone command; the **dashboard** is their shared keyless front-en
 
 ### 6a. Doctor / freshness (`clothaid doctor`)
 
-Re-runnable audit generalizing the frontrunner's `freshness-audit` skill + map-staleness (a
+Re-runnable audit generalizing the reference project's `freshness-audit` skill + map-staleness (a
 recurring real-repo pain): map lists files that no longer exist? documented commands still resolve? leash
 claims ("gh not allowed") still true? "blocked-on" claims still true? canvas/status vs the actual
 tree? **CI-installable** to fail on drift. Feeds the dashboard.
@@ -165,7 +165,7 @@ tree? **CI-installable** to fail on drift. Feeds the dashboard.
 ### 6b. Metrics / measurement (`clothaid metrics`)
 
 Instruments the loop — session weight, iteration count, reversals, rework %, revert %, lead
-time/story vs a baseline — generalizing the frontrunner's existing loop-metrics instrument.
+time/story vs a baseline — generalizing the reference project's existing loop-metrics instrument.
 Fed automatically by the **session runner** (§6f) so measurement is free, not a chore. Strict-by-
 default methodology (matched comparisons, named limits).
 
@@ -180,7 +180,7 @@ version. This is how the tool learns from the corpus repos continuing to evolve.
 
 - **Free tier, always project-agnostic**: install the tracked-hooks gate model — `process →
 pre-commit`, `correctness → pre-push` (format/types/lint over the working tree) — via
-  `.githooks/` + `core.hooksPath` (workspace-fullstack's multi-agent-safe, git-level pattern). **No keys.**
+  `.githooks/` + `core.hooksPath` (the reference project's multi-agent-safe, git-level pattern). **No keys.**
 - **Opt-in AI-review CI job** (`--ci`): an `AI-judgment → advisory` PR review of the kind already
   proven in the corpus — **bring-your-own-key**, auto-detects an existing CI AI-review setup (free
   on the corpus projects), skipped cleanly where no key/CI exists. Never a hard requirement.
@@ -194,8 +194,8 @@ needing no credentials.
 
 ### 6f. Session runner (`clothaid session start|end`)
 
-Encodes workspace-fullstack's session protocol: `start` opens a session with the right context loaded (state →
-map → task); `end` drafts the R5 archive + `PROJECT_CONTEXT.md` mirror and enforces gapless
+Encodes the reference project's session protocol: `start` opens a session with the right context loaded (state →
+map → task); `end` drafts the session archive + `PROJECT_CONTEXT.md` mirror and enforces gapless
 Task↔Session numbering. The **operational heartbeat**, and it auto-emits the measured unit §6b
 consumes — measurement becomes a side effect of working, not extra work.
 
@@ -220,7 +220,7 @@ keep for new teammates and widens the buyer to team leads.
 ### 6j. Networked failure-modes (`clothaid failure add`)
 
 Append to the local `failure-modes` register when an agent hits an environment trap; `harvest`
-promotes cross-project ones into the shared pack. workspace-fullstack's failure-modes skill, networked.
+promotes cross-project ones into the shared pack. The reference project's failure-modes skill, networked.
 
 ## 7. Command surface (sketch, not final)
 
@@ -246,7 +246,7 @@ clothaid dashboard       # keyless local metrics/status surface
   is IT-professionals — sensible interactive defaults + power-user flags; **not overly complex**).
 - Package-manager-agnostic execution (detects pnpm/yarn/npm from lockfile).
 - Adapters + agents + knowledge packs are **plugin-shaped** so the tool grows without core churn.
-- Pin deps exact (workspace-fullstack convention); the tool holds itself to the standard it installs
+- Pin deps exact (the reference project's convention); the tool holds itself to the standard it installs
   (dogfood: `clothaid` sets up `clothaid`).
 
 ## 9. v0.0.1 scope & phasing
@@ -254,7 +254,7 @@ clothaid dashboard       # keyless local metrics/status surface
 **In v0.0.1** (all modes write, per decision; iterate quality after):
 
 - New repo + `sources.json` corpus + the dogfood diff harness (§2).
-- Knowledge pack v1 (default workspace-fullstack-standard) + maturity rubric (§3a).
+- Knowledge pack v1 (default reference-standard) + maturity rubric (§3a).
 - Reckon: deterministic scan + agent-orchestrated brief/ingest (§5a).
 - All three modes with scorecards, sharing one engine (§5b).
 - Leash capture (detected + suggested + user-specific) (§5c).
@@ -268,17 +268,17 @@ adapters, networked failure-modes. (Ordering set when we move from design to bui
 
 ## 10. Verification / dogfooding (how we know it works)
 
-- **Corpus reproduction**: run against the frontrunner checkout and diff generated vs hand-built
-  `AGENTS.md`/map-skill/gates — the frontrunner is the golden fixture.
+- **Corpus reproduction**: run against the reference project's checkout and diff generated vs hand-built
+  `AGENTS.md`/map-skill/gates — the reference project is the golden fixture.
 - **Shape coverage**: run against each of the other corpus repos —
   each exercises a different topology/command-set/hook-setup the scan must get right.
 - **Self-setup**: `clothaid` installs its own workflow into its own repo (dogfood).
 - **Mode coverage**: Fresh on a scratch repo; Migration/Optimisation on a corpus repo with its
   existing setup temporarily treated as "other".
 
-## 11. Open decisions for the owner
+## 11. Open decisions
 
-1. ~~Name~~ — **decided: `clothaid`** (npm-available, owner-confirmed).
+1. ~~Name~~ — **decided: `clothaid`** (npm-available, author-confirmed).
 2. **Adapter target list for v0.0.1** — assumed Claude Code + Cursor + Copilot (the initial
    three); confirm none others are needed on day one.
 3. **Fast-follow ordering** — set when design → build (leaning: doctor + session-runner + metrics
