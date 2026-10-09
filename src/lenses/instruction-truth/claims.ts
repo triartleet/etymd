@@ -503,12 +503,28 @@ export interface DocRefs {
 // through the shared CREATION_CONTEXT_RE — plus an explicit absence statement. Narrow on
 // purpose: every phrase here must be an unambiguous "it is not meant to exist", because each
 // one widens the set of stale pointers that pass silently.
-const ABSENCE_CONTEXT_RE =
-  /\b(?:no\s+such\s+(?:file|doc(?:ument)?)|none\s+exists|does\s+not\s+exist|doesn'?t\s+exist|deliberately\s+absent|never\s+existed)\b/i
+//
+// Every absence and creation phrase is anchored ADJACENT to the mention — ending directly
+// before it, or beginning directly after it — never merely somewhere on its line: "if the cache
+// does not exist, read CLAUDE.md" is an absence statement about the CACHE, and the line-wide
+// test let it silence the missing-doc finding while the doc stayed missing. Adjacency is what
+// ties the phrase to the document; only gap characters, punctuation and an article may sit
+// between.
+//
 // "no `CLAUDE.md` exists here" carries the negation directly before the mention, so the test
 // is against the same line's prefix, backticks and quotes allowed in between — a "no" elsewhere
 // on the line ("we saw no reason") must not reach it.
-const NO_DOC_PREFIX_RE = /\bno\s+(?:such\s+)?[\s`'"]*$/i
+const NO_DOC_PREFIX_RE =
+  /\b(?:there\s+is\s+)?no\s+(?:such\s+(?:file|doc(?:ument)?)?\s*(?:as\s+)?)?[\s`'"]*$/i
+// "`DECISIONS.md` does not exist" carries it directly after: gap characters and punctuation
+// may follow the mention, then the phrase must begin. The will-be-created family lives here
+// because its verb follows the name too ("CHANGELOG.md will be generated").
+const ABSENCE_AFTER_RE =
+  /^[\s,;:.`'"\u2013\u2014]*(?:does\s+not\s+exist|doesn'?t\s+exist|is\s+(?:deliberately\s+)?absent|never\s+existed|none\s+exists|will\s+be\s+(?:created|generated|written))\b/i
+// What may sit between a creation phrase and the mention it explains: gap characters, an
+// article, or a determiner — "creating a `CLAUDE.md`" — and nothing else, so creation language
+// about a different object on the line ("when creating the cache, read CLAUDE.md") stays out.
+const CREATION_GAP_RE = /^(?:\s*(?:a|an|the|this|these|those|it|its|them|one|new|your|our)|[\s`'"])*$/i
 
 /**
  * A bare substring match is not enough: `~/.claude/CLAUDE.md` mentions CLAUDE.md but points at
@@ -533,11 +549,18 @@ export function extractDocRefs(text: string): DocRefs {
         tildeSkipped += 1
       } else {
         const lineStart = text.lastIndexOf("\n", at) + 1
-        const context = claimContext(text, head)
+        const lineEndRaw = text.indexOf("\n", at + name.length)
+        const lineEnd = lineEndRaw === -1 ? text.length : lineEndRaw
+        const before = text.slice(lineStart, head)
+        const after = text.slice(at + name.length, lineEnd)
+        // Creation prose must END against the mention (an article may bridge), never merely
+        // share its line; absence phrases anchor on either side the same way.
+        const creation = CREATION_CONTEXT_RE.exec(before)
         const deliberate =
-          NO_DOC_PREFIX_RE.test(text.slice(lineStart, head)) ||
-          CREATION_CONTEXT_RE.test(context) ||
-          ABSENCE_CONTEXT_RE.test(context)
+          NO_DOC_PREFIX_RE.test(before) ||
+          ABSENCE_AFTER_RE.test(after) ||
+          (creation !== null &&
+            CREATION_GAP_RE.test(before.slice(creation.index + creation[0].length)))
         if (deliberate) absenceSkipped += 1
         else claimed = true
       }
