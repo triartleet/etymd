@@ -208,6 +208,50 @@ describe("doc-ref extraction (home paths are not repo paths)", () => {
     expect(refs).toEqual([])
     expect(absenceSkipped).toBe(3)
   })
+
+  it("an anchor reaches across one line break — wrapped prose is still one sentence", () => {
+    // The wrapped shape: "Edit instructions here; there is no\n`CLAUDE.md`, and adding one
+    // would hide this file from Claude Code." — the negation ends the wrapped line, the doc
+    // name opens the next. A paragraph break must still block the reach.
+    const { refs, absenceSkipped } = extractDocRefs(
+      "Edit instructions here; there is no\n`CLAUDE.md`, and adding one would hide this file.\n",
+    )
+    expect(refs).toEqual([])
+    expect(absenceSkipped).toBe(1)
+    const paragraph = extractDocRefs("There is no such doc.\n\nCLAUDE.md holds the rules.\n")
+    expect(paragraph.refs).toEqual(["CLAUDE.md"])
+  })
+
+  it("never-recreate prose anchors the doc it forbids, across the break", () => {
+    const { refs, absenceSkipped } = extractDocRefs(
+      "edit this file, and never recreate\nCLAUDE.md with separate content.\n",
+    )
+    expect(refs).toEqual([])
+    expect(absenceSkipped).toBe(1)
+  })
+
+  it("one anchored absence covers its sentence's other mentions of the same doc", () => {
+    // The removal memorial: one sentence names the doc three ways — the pointer that was let
+    // go, the instruction never to recreate it, the shape of the thing to restore. The
+    // anchored mention covers its sentence-mates; the indefinite article carries the mention
+    // in the sentence after, which anchors on its own.
+    const { refs, absenceSkipped } = extractDocRefs(
+      "That check is what let the CLAUDE.md pointer go in 9cc6915; edit this file, and never " +
+        "recreate CLAUDE.md with separate content. If a harness stops picking this file up, " +
+        "restore the pointer form (a CLAUDE.md containing `@AGENTS.md`), not a copy.\n",
+    )
+    // `@AGENTS.md` stays a claim — the doc exists; only the CLAUDE.md mentions are the point.
+    expect(refs).toEqual(["AGENTS.md"])
+    expect(absenceSkipped).toBe(3)
+  })
+
+  it("the sentence cover stops at the sentence — a later plain mention still claims", () => {
+    const { refs, absenceSkipped } = extractDocRefs(
+      "Never recreate CLAUDE.md. The setup details live in CLAUDE.md.\n",
+    )
+    expect(refs).toEqual(["CLAUDE.md"])
+    expect(absenceSkipped).toBe(1)
+  })
 })
 
 describe("instruction-truth lens (the lying-AGENTS.md fixture)", () => {
@@ -314,6 +358,17 @@ describe("instruction-truth lens (the lying-AGENTS.md fixture)", () => {
     // the negation was the cache's, not the doc's, and line-wide matching could not tell.
     await write("package.json", JSON.stringify({ name: "cacheline", private: true }))
     await write("AGENTS.md", "# AGENTS.md\n\nIf the cache does not exist, read CLAUDE.md.\n")
+    const report = await runTruth()
+    expect(report.findings.map((f) => f.id)).toContain(
+      "instruction-truth/dangling-ref:AGENTS.md:CLAUDE.md",
+    )
+  })
+
+  it("a plain pointer to a missing doc still reports, beside all the skip classes", async () => {
+    // The acceptance shape: no negation anywhere near the mention — the skip classes must
+    // never grow to swallow a plain "see CLAUDE.md for details".
+    await write("package.json", JSON.stringify({ name: "plainref", private: true }))
+    await write("AGENTS.md", "# AGENTS.md\n\nsee CLAUDE.md for details.\n")
     const report = await runTruth()
     expect(report.findings.map((f) => f.id)).toContain(
       "instruction-truth/dangling-ref:AGENTS.md:CLAUDE.md",

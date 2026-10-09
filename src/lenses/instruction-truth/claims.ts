@@ -240,7 +240,7 @@ export const KNOWN_EXTENSIONS = new Set([
 // (migration quarantine dirs, generated outputs), the second new skip class after
 // Better-Auth dotted notation.
 const CREATION_CONTEXT_RE =
-  /\b(?:creat(?:e|es|ed|ing)|generat(?:e|es|ed|ing)|scaffold(?:s|ed|ing)?|quarantin(?:e|es|ed|ing)|(?:writ(?:e|es|ten|ing)|output(?:s|ted)?|emit(?:s|ted|ting)?|sav(?:e|es|ed|ing)|mov(?:e|es|ed|ing)|copy|copi(?:es|ed))\s+(?:it\s+|them\s+)?(?:to|into)|new\s+(?:file|directory|folder)|will\s+(?:be\s+)?(?:created|generated|written)|add(?:s|ed|ing)?\s+(?:a|the)\s+new)\b/i
+  /\b(?:(?:re)?creat(?:e|es|ed|ing)|generat(?:e|es|ed|ing)|scaffold(?:s|ed|ing)?|quarantin(?:e|es|ed|ing)|(?:writ(?:e|es|ten|ing)|output(?:s|ted)?|emit(?:s|ted|ting)?|sav(?:e|es|ed|ing)|mov(?:e|es|ed|ing)|copy|copi(?:es|ed))\s+(?:it\s+|them\s+)?(?:to|into)|new\s+(?:file|directory|folder)|will\s+(?:be\s+)?(?:created|generated|written)|add(?:s|ed|ing)?\s+(?:a|the)\s+new)\b/i
 
 // A path named beside the URL it is FETCHED from ("Fetch `docs/x.md` from `https://…`") points
 // into another tree: the reference may be real, but not in this repo — the same principle the
@@ -492,7 +492,7 @@ export interface DocRefs {
   refs: string[]
   /** Mentions embedded in `~/`-home paths — outside the repo, unverifiable from it. */
   tildeSkipped: number
-  /** Mentions whose own line says the doc deliberately does not exist here — skipped, counted. */
+  /** Mentions skipped as deliberate absence — anchored prose at the mention, or its sentence carrying one — counted. */
   absenceSkipped: number
 }
 
@@ -509,13 +509,20 @@ export interface DocRefs {
 // does not exist, read CLAUDE.md" is an absence statement about the CACHE, and the line-wide
 // test let it silence the missing-doc finding while the doc stayed missing. Adjacency is what
 // ties the phrase to the document; only gap characters, punctuation and an article may sit
-// between.
+// between. The anchor may cross ONE line break of pure whitespace ("there is no\n`CLAUDE.md`,
+// and adding one would hide this file") because wrapped prose is still one sentence — but
+// never a paragraph break, and never so much as a word.
 //
 // "no `CLAUDE.md` exists here" carries the negation directly before the mention, so the test
 // is against the same line's prefix, backticks and quotes allowed in between — a "no" elsewhere
 // on the line ("we saw no reason") must not reach it.
 const NO_DOC_PREFIX_RE =
   /\b(?:there\s+is\s+)?no\s+(?:such\s+(?:file|doc(?:ument)?)?\s*(?:as\s+)?)?[\s`'"]*$/i
+// The indefinite article directly before the mention ("restore the pointer form (a
+// `CLAUDE.md` containing `@AGENTS.md`)") names a KIND of file, not the repo's file — a
+// reference to the document itself would say "the". Grammatically non-referential, whatever
+// the rest of the sentence does.
+const INDEFINITE_DOC_PREFIX_RE = /\b(?:a|an)[\s`'"]*$/i
 // "`DECISIONS.md` does not exist" carries it directly after: gap characters and punctuation
 // may follow the mention, then the phrase must begin. The will-be-created family lives here
 // because its verb follows the name too ("CHANGELOG.md will be generated").
@@ -524,22 +531,75 @@ const ABSENCE_AFTER_RE =
 // What may sit between a creation phrase and the mention it explains: gap characters, an
 // article, or a determiner — "creating a `CLAUDE.md`" — and nothing else, so creation language
 // about a different object on the line ("when creating the cache, read CLAUDE.md") stays out.
-const CREATION_GAP_RE = /^(?:\s*(?:a|an|the|this|these|those|it|its|them|one|new|your|our)|[\s`'"])*$/i
+const CREATION_GAP_RE =
+  /^(?:\s*(?:a|an|the|this|these|those|it|its|them|one|new|your|our)|[\s`'"])*$/i
+
+// A sentence terminator for the sibling cover below: a period, question or exclamation mark,
+// optionally followed by closing brackets and quotes, then whitespace or the end of text —
+// so "instructions)." ends a sentence while "2.1.277.1" does not.
+const SENTENCE_END_RE = /[.!?][)\]}'"’”]*(?=\s|$)/g
 
 /**
  * A bare substring match is not enough: `~/.claude/CLAUDE.md` mentions CLAUDE.md but points at
  * the reader's machine, never at the repo — treating it as a repo ref accused a true sentence of
  * lying (the home file existed; the repo never had one). A home-path occurrence is skipped and
  * counted like the absolute tokens below; one ordinary occurrence still makes the doc a claim.
- * Deliberate-absence prose gets the same per-mention rule: one plain mention beside the
- * explanation still claims the doc, so a true stale pointer ("see CLAUDE.md for details")
- * flags exactly as before.
+ * Deliberate-absence prose gets the same per-mention rule with one extension: a plain mention
+ * in the SAME SENTENCE as an anchored absence of the same doc is covered by it (see below), so
+ * a true stale pointer ("see CLAUDE.md for details", alone in its sentence) flags exactly as
+ * before.
  */
+// The prefix context reaches back over the mention's line start and across ONE line break of
+// pure whitespace, to the start of the previous line — never across a blank line, which is a
+// paragraph boundary and a new thought.
+function wrapAwareStart(text: string, lineStart: number): number {
+  let i = lineStart
+  while (i > 0 && (text[i - 1] === " " || text[i - 1] === "\t")) i -= 1
+  if (i > 0 && text[i - 1] === "\n") return text.lastIndexOf("\n", i - 2) + 1
+  return lineStart
+}
+
+// The suffix mirror: across one line break, but only onto a line that carries content.
+function wrapAwareEnd(text: string, lineEnd: number): number {
+  let i = lineEnd
+  while (i < text.length && (text[i] === " " || text[i] === "\t")) i += 1
+  if (i + 1 < text.length && text[i] === "\n" && text[i + 1] !== "\n") {
+    const next = text.indexOf("\n", i + 1)
+    return next === -1 ? text.length : next
+  }
+  return i
+}
+
+function sentenceStartOf(text: string, at: number): number {
+  const prefix = text.slice(0, at)
+  SENTENCE_END_RE.lastIndex = 0
+  let start = 0
+  for (let m = SENTENCE_END_RE.exec(prefix); m !== null; m = SENTENCE_END_RE.exec(prefix)) {
+    start = m.index + m[0].length
+  }
+  return start
+}
+
+function sentenceEndOf(text: string, from: number): number {
+  SENTENCE_END_RE.lastIndex = from
+  const m = SENTENCE_END_RE.exec(text)
+  return m === null ? text.length : m.index + m[0].length
+}
+
 export function extractDocRefs(text: string): DocRefs {
   const refs: string[] = []
   let tildeSkipped = 0
   let absenceSkipped = 0
   for (const name of KNOWN_DOC_REFS) {
+    // A sentence that states a doc's deliberate absence once may name the doc several times —
+    // the memorial of the removal ("the CLAUDE.md pointer go in 9cc6915"), the instruction
+    // never to recreate it, the shape of the thing to restore. One ANCHORED absence in a
+    // sentence covers that sentence's other mentions of the same doc; the cover is the
+    // sentence, never the paragraph, and a sentence whose absence phrase belongs to another
+    // object ("if the cache does not exist, read CLAUDE.md") anchors nothing and covers
+    // nothing.
+    const anchored: boolean[] = []
+    const spans: Array<[number, number]> = []
     let claimed = false
     let at = text.indexOf(name)
     while (at !== -1) {
@@ -548,23 +608,40 @@ export function extractDocRefs(text: string): DocRefs {
       if (text[head] === "~") {
         tildeSkipped += 1
       } else {
-        const lineStart = text.lastIndexOf("\n", at) + 1
-        const lineEndRaw = text.indexOf("\n", at + name.length)
-        const lineEnd = lineEndRaw === -1 ? text.length : lineEndRaw
-        const before = text.slice(lineStart, head)
-        const after = text.slice(at + name.length, lineEnd)
+        const end = at + name.length
+        const before = text.slice(wrapAwareStart(text, text.lastIndexOf("\n", at) + 1), head)
+        const after = text.slice(
+          end,
+          wrapAwareEnd(
+            text,
+            text.indexOf("\n", end) === -1 ? text.length : text.indexOf("\n", end),
+          ),
+        )
         // Creation prose must END against the mention (an article may bridge), never merely
         // share its line; absence phrases anchor on either side the same way.
         const creation = CREATION_CONTEXT_RE.exec(before)
         const deliberate =
           NO_DOC_PREFIX_RE.test(before) ||
+          INDEFINITE_DOC_PREFIX_RE.test(before) ||
           ABSENCE_AFTER_RE.test(after) ||
           (creation !== null &&
             CREATION_GAP_RE.test(before.slice(creation.index + creation[0].length)))
-        if (deliberate) absenceSkipped += 1
-        else claimed = true
+        anchored.push(deliberate)
+        spans.push([sentenceStartOf(text, head), sentenceEndOf(text, end)])
       }
       at = text.indexOf(name, at + name.length)
+    }
+    for (let i = 0; i < anchored.length; i += 1) {
+      if (anchored[i]) {
+        absenceSkipped += 1
+        continue
+      }
+      const here = spans[i] as [number, number]
+      const covered = spans.some(
+        (span, j) => j !== i && anchored[j] && here[0] < span[1] && span[0] < here[1],
+      )
+      if (covered) absenceSkipped += 1
+      else claimed = true
     }
     if (claimed) refs.push(name)
   }
